@@ -52,7 +52,7 @@
 
   svg.icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
 
-  /* ---------- Background layer (anime theme) ---------- */
+  /* ---------- Background layer (in-chat anime theme) ---------- */
   #bgLayer {
     position: fixed;
     inset: 0;
@@ -72,33 +72,60 @@
     pointer-events: none;
   }
 
-  #usernameModal {
+  /* ---------- Auth screens background slideshow (naam/group screens) ---------- */
+  #authBg {
     position: fixed;
     inset: 0;
-    background: rgba(8, 8, 16, 0.82);
-    backdrop-filter: blur(14px);
+    z-index: 900;
+  }
+  #authBg.hide { display: none; }
+  .authBgSlide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+    filter: saturate(0.85) brightness(0.5) blur(1px);
+    transform: scale(1.04);
+  }
+  #authBgOverlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(170deg, rgba(7,7,15,0.55) 0%, rgba(10,9,20,0.6) 45%, rgba(14,9,24,0.78) 100%);
+    pointer-events: none;
+  }
+
+  /* ---------- Shared auth modal shell (naam / group screens) ---------- */
+  .authModal {
+    position: fixed;
+    inset: 0;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
   }
+  .authModal.hide { display: none; }
 
   .modal-box {
     background: var(--glass-bg-strong);
     border: 1px solid var(--glass-border);
     border-radius: 24px;
-    padding: 36px 30px;
+    padding: 34px 28px;
     width: 100%;
-    max-width: 380px;
+    max-width: 400px;
     text-align: center;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    backdrop-filter: blur(24px);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+    backdrop-filter: blur(28px);
+    max-height: calc(var(--app-h) - 40px);
+    overflow-y: auto;
   }
 
   .modal-logo {
     width: 52px; height: 52px;
-    margin: 0 auto 18px;
+    margin: 0 auto 16px;
     border-radius: 16px;
     background: linear-gradient(135deg, var(--accent), #6d4fc9);
     display: flex; align-items: center; justify-content: center;
@@ -106,33 +133,63 @@
   }
   .modal-logo svg { width: 26px; height: 26px; stroke: #fff; }
 
-  .modal-box h1 { font-size: clamp(20px, 6vw, 24px); margin-bottom: 6px; font-weight: 800; letter-spacing: -0.02em; }
-  .modal-box p { color: var(--text-muted); margin-bottom: 22px; font-size: 13.5px; }
+  .modal-box h1 { font-size: clamp(19px, 6vw, 23px); margin-bottom: 5px; font-weight: 800; letter-spacing: -0.02em; }
+  .modal-box p.sub { color: var(--text-muted); margin-bottom: 20px; font-size: 13px; line-height: 1.4; }
 
   .modal-box input {
     width: 100%;
-    padding: 14px 16px;
+    padding: 13px 16px;
     border-radius: 14px;
     border: 1px solid var(--glass-border);
     background: rgba(255,255,255,0.06);
     color: var(--text-light);
     font-family: var(--font);
     font-size: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     outline: none;
     transition: border-color 0.15s ease;
   }
   .modal-box input:focus { border-color: var(--accent); }
+  .modal-box input.codeInput { text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; text-align: center; }
+
+  #usernameInput {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.20);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.28);
+    font-size: 17px;
+    font-weight: 600;
+    padding: 15px 18px;
+    text-align: center;
+    transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  #usernameInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft), inset 0 1px 0 rgba(255,255,255,0.12), 0 10px 26px rgba(0,0,0,0.3);
+    transform: translateY(-1px);
+  }
+
+  @keyframes modalPopIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-box { animation: modalPopIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  .modal-logo { animation: logoFloat 3.2s ease-in-out infinite; }
 
   .btn {
     width: 100%;
-    padding: 14px;
+    padding: 13px;
     border: none;
     border-radius: 14px;
     background: linear-gradient(135deg, var(--accent), #6d4fc9);
     color: #fff;
     font-family: var(--font);
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.15s ease, opacity 0.15s ease;
@@ -140,6 +197,197 @@
   }
   .btn:hover { transform: translateY(-2px); opacity: 0.94; }
   .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.55; cursor: default; transform: none; }
+  .btn.secondary {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--glass-border);
+  }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+  }
+
+  .authError {
+    display: none;
+    background: rgba(251,113,133,0.12);
+    border: 1px solid rgba(251,113,133,0.3);
+    color: var(--danger);
+    font-size: 12.5px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    text-align: left;
+  }
+  .authError.show { display: block; }
+
+  /* ---------- Room home screen (create / join group) ---------- */
+  .roomTabs {
+    display: flex;
+    gap: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 18px;
+  }
+  .roomTab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .roomTab.active { background: var(--accent-soft); color: var(--accent); }
+
+  .roomPane { display: none; text-align: left; }
+  .roomPane.active { display: block; }
+  .roomPane label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+    margin-top: 2px;
+  }
+
+  #joinPasswordWrap { display: none; }
+  #joinPasswordWrap.show { display: block; }
+
+  #inviteBar {
+    display: none;
+    background: rgba(94,234,212,0.09);
+    border: 1px solid rgba(94,234,212,0.25);
+    border-radius: 13px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    text-align: left;
+    font-size: 12.5px;
+  }
+  #inviteBar.show { display: block; }
+  #inviteBar .inviteGroupName { font-weight: 700; color: var(--accent2); display: block; margin-bottom: 2px; }
+
+  .recentGroups {
+    margin-top: 18px;
+    text-align: left;
+  }
+  .recentGroups h3 {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .recentGroupItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .recentGroupItem:hover { background: rgba(255,255,255,0.08); }
+  .recentGroupAvatar {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(178,148,245,0.35), rgba(109,79,201,0.3));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .recentGroupInfo { min-width: 0; flex: 1; }
+  .recentGroupName { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recentGroupCode { font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; }
+
+  /* ---------- Members / online modal (Telegram-style "tap to see who's here") ---------- */
+  .memberItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 13px;
+    margin-bottom: 7px;
+  }
+  .memberAvatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(178,148,245,0.35), rgba(109,79,201,0.3));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .memberAvatar::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent2);
+    border: 2px solid var(--glass-bg-strong);
+  }
+  .memberInfo { min-width: 0; flex: 1; }
+  .memberName { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .memberStatus { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+  .memberStatus.inCall { color: var(--accent2); font-weight: 600; }
+  #membersEmpty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0; }
+
+  #createSuccessBox { display: none; text-align: left; }
+  #createSuccessBox.show { display: block; }
+  #createSuccessBox .successIcon {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent2);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+  }
+  #createSuccessBox h2 { font-size: 17px; text-align: center; margin-bottom: 4px; }
+  #createSuccessBox p.sub2 { text-align: center; margin-bottom: 16px; }
+  .shareLinkRow {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .shareLinkRow input {
+    margin-bottom: 0;
+    font-size: 12.5px;
+  }
+  .shareLinkRow button {
+    flex-shrink: 0;
+    width: 46px;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .codeDisplay {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--accent2);
+    background: rgba(94,234,212,0.08);
+    border: 1px dashed rgba(94,234,212,0.3);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
 
   #app {
     display: none;
@@ -200,6 +448,49 @@
     line-height: 1;
     padding: 4px;
   }
+
+  /* Current group card in sidebar */
+  #currentGroupCard {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 18px;
+  }
+  #currentGroupCard .groupCardName {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #currentGroupCard .groupCardCode {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  #currentGroupCard .groupCardActions {
+    display: flex;
+    gap: 6px;
+  }
+  #currentGroupCard .groupCardActions button {
+    flex: 1;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-light);
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s ease;
+  }
+  #currentGroupCard .groupCardActions button:hover { background: rgba(255,255,255,0.1); }
+  #currentGroupCard .groupCardActions svg { width: 13px; height: 13px; }
 
   #onlineList { list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }
   #onlineList li {
@@ -287,8 +578,6 @@
   #chatHeader h1 {
     font-size: 16.5px;
     font-weight: 700;
-    flex: 1;
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -296,6 +585,26 @@
     align-items: center;
     gap: 8px;
   }
+  #chatHeaderTitle {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  #chatHeaderSubtitle {
+    font-size: 11.5px;
+    color: var(--accent2);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    width: fit-content;
+    transition: opacity 0.15s ease;
+  }
+  #chatHeaderSubtitle:hover { opacity: 0.8; text-decoration: underline; }
   #unreadBadge {
     display: none;
     background: var(--danger);
@@ -306,6 +615,7 @@
     border-radius: 20px;
     min-width: 17px;
     text-align: center;
+    flex-shrink: 0;
   }
   #unreadBadge.show { display: inline-block; }
 
@@ -692,6 +1002,40 @@
   #fileInput { display: none; }
   #menuToggle { display: none; }
 
+  #emojiBtn { font-size: 19px; }
+
+  #emojiPicker {
+    display: none;
+    margin: 0 16px;
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(20px);
+    padding: 10px;
+    max-height: 190px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  #emojiPicker.show { display: block; margin-top: 10px; }
+  #emojiGrid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+  }
+  #emojiGrid button {
+    background: none;
+    border: none;
+    font-size: 21px;
+    padding: 6px 0;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.12s ease, transform 0.12s ease;
+  }
+  #emojiGrid button:hover { background: rgba(255,255,255,0.1); transform: scale(1.15); }
+  @media (max-width: 380px) {
+    #emojiGrid { grid-template-columns: repeat(6, 1fr); }
+  }
+
   #imageLightbox {
     display: none;
     position: fixed;
@@ -715,6 +1059,28 @@
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
+
+  /* ---------- Toast (link copied waghera) ---------- */
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    color: var(--text-light);
+    padding: 11px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    backdrop-filter: blur(18px);
+    z-index: 3000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ---------- Group call ---------- */
   #callBtn.active {
@@ -875,24 +1241,113 @@
   <div id="bgLayer"></div>
   <div id="bgOverlay"></div>
 
-  <div id="usernameModal">
+  <!-- ---------- Animated slideshow background for the auth screens (naam / group) ---------- -->
+  <div id="authBg">
+    <div class="authBgSlide" id="authBgSlideA"></div>
+    <div class="authBgSlide" id="authBgSlideB"></div>
+    <div id="authBgOverlay"></div>
+  </div>
+
+  <!-- ---------- Step 1: Naam entry ---------- -->
+  <div id="usernameModal" class="authModal">
     <div class="modal-box">
       <div class="modal-logo">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
       </div>
       <h1>Chat</h1>
-      <p>Shamil hone ke liye apna naam daalein</p>
+      <p class="sub" id="usernameSub">Shamil hone ke liye apna naam daalein</p>
       <input type="text" id="usernameInput" placeholder="Apna naam likhein..." maxlength="20" enterkeyhint="go" autocapitalize="words" autocomplete="off" />
       <button class="btn" id="joinBtn">
-        Chat me Jaayein
+        Aage Badhein
         <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
+    </div>
+  </div>
+
+  <!-- ---------- Step 2: Group create / join home screen ---------- -->
+  <div id="roomModal" class="authModal hide">
+    <div class="modal-box">
+
+      <div id="inviteBar">
+        <span class="inviteGroupName" id="inviteGroupName"></span>
+        <span id="inviteGroupSub">Aapko is group me invite kiya gaya hai</span>
+      </div>
+
+      <div class="modal-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h1 id="roomModalTitle">Groups</h1>
+      <p class="sub">Naya group banayein ya kisi group me shamil hon</p>
+
+      <div class="authError" id="roomError"></div>
+
+      <div class="roomTabs">
+        <button class="roomTab active" id="tabJoin" type="button">Join Karein</button>
+        <button class="roomTab" id="tabCreate" type="button">+ Naya Group</button>
+      </div>
+
+      <!-- Join pane -->
+      <div class="roomPane active" id="paneJoin">
+        <label for="joinCodeInput">Group Code</label>
+        <input type="text" id="joinCodeInput" class="codeInput" placeholder="Jaise: K7QX2P" maxlength="6" enterkeyhint="go" autocomplete="off" />
+        <div id="joinPasswordWrap">
+          <label for="joinPasswordInput">Password</label>
+          <input type="password" id="joinPasswordInput" placeholder="Group password" enterkeyhint="go" autocomplete="off" />
+        </div>
+        <button class="btn" id="joinRoomBtn">
+          Group Join Karein
+          <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+
+        <div class="recentGroups" id="recentGroupsWrap" style="display:none;">
+          <h3>Aapke Groups</h3>
+          <div id="recentGroupsList"></div>
+        </div>
+      </div>
+
+      <!-- Create pane -->
+      <div class="roomPane" id="paneCreate">
+        <label for="createNameInput">Group ka Naam</label>
+        <input type="text" id="createNameInput" placeholder="Jaise: Family, Dost Log..." maxlength="40" autocomplete="off" />
+        <label for="createPasswordInput">Password (optional)</label>
+        <input type="password" id="createPasswordInput" placeholder="Khaali chhodein agar nahi chahiye" maxlength="40" autocomplete="off" />
+        <button class="btn" id="createRoomBtn">
+          Group Banayein
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <!-- Success pane (after creating a group — share link) -->
+      <div id="createSuccessBox">
+        <div class="successIcon"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h2 id="successGroupName">Group ban gaya!</h2>
+        <p class="sub sub2">Ye code ya link doston ko bhejein</p>
+        <div class="codeDisplay" id="successCode">------</div>
+        <div class="shareLinkRow">
+          <input type="text" id="successLinkInput" readonly />
+          <button id="copyLinkBtn" title="Link copy karein"><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+        <button class="btn" id="enterGroupBtn">
+          Group me Jaayein
+          <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
     </div>
   </div>
 
   <div id="app">
     <div id="sidebarOverlay"></div>
     <div id="sidebar">
+      <div id="currentGroupCard">
+        <div class="groupCardName" id="sidebarGroupName">—</div>
+        <div class="groupCardCode" id="sidebarGroupCode">—</div>
+        <div class="groupCardActions">
+          <button id="shareGroupBtn"><svg class="icon" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share</button>
+          <button id="switchGroupBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Groups</button>
+        </div>
+      </div>
+
       <h2>
         <span class="titleGroup"><span class="dot"></span> Online</span>
         <button id="sidebarCloseBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -912,7 +1367,10 @@
     <div id="main">
       <div id="chatHeader">
         <button class="iconBtn" id="menuToggle"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-        <h1><span id="roomTitle">Group Chat</span><span id="unreadBadge">0</span></h1>
+        <div id="chatHeaderTitle">
+          <h1><span id="roomTitle">Group Chat</span><span id="unreadBadge">0</span></h1>
+          <span id="chatHeaderSubtitle">0 online</span>
+        </div>
         <div id="callBtnWrap">
           <button class="iconBtn" id="callBtn" title="Call shuru karein">
             <svg class="icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.79.68 2.63a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.45-1.27a2 2 0 0 1 2.11-.45c.84.33 1.73.56 2.63.68A2 2 0 0 1 22 16.92z"/></svg>
@@ -955,9 +1413,14 @@
         <button id="removeAttachBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
 
+      <div id="emojiPicker">
+        <div id="emojiGrid"></div>
+      </div>
+
       <div id="inputBar">
         <button class="iconBtn" id="attachBtn" title="File/Photo attach karein"><svg class="icon" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
         <input type="file" id="fileInput" accept="*/*" />
+        <button class="iconBtn" id="emojiBtn" title="Emoji">🙂</button>
         <input type="text" id="msgInput" placeholder="Message likhein..." autocomplete="off" enterkeyhint="send" autocapitalize="sentences" />
         <button class="iconBtn" id="sendBtn" title="Send"><svg class="icon" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
       </div>
@@ -975,6 +1438,17 @@
   <div id="imageLightbox">
     <button class="closeLightbox" id="closeLightboxBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     <img id="lightboxImg" src="" alt="" />
+  </div>
+
+  <!-- ---------- Members / online modal (Telegram-style member list) ---------- -->
+  <div id="membersModal" class="authModal hide" style="z-index:1600;">
+    <div class="modal-box" style="max-width: 360px; text-align: left;">
+      <h1 style="text-align:center;">Group Members</h1>
+      <p class="sub" id="membersModalSub" style="text-align:center;">0 online</p>
+      <div id="membersList"></div>
+      <div id="membersEmpty" style="display:none;">Abhi koi bhi online nahi hai</div>
+      <button class="btn ghost" id="closeMembersBtn">Band Karein</button>
+    </div>
   </div>
 
   <!-- ---------- Group voice/video call overlay ---------- -->
@@ -998,13 +1472,42 @@
     </div>
   </div>
 
+  <div id="toast"></div>
+
 <script>
 (function () {
   "use strict";
 
   const usernameModal   = document.getElementById("usernameModal");
   const usernameInput   = document.getElementById("usernameInput");
+  const usernameSub     = document.getElementById("usernameSub");
   const joinBtn         = document.getElementById("joinBtn");
+
+  const roomModal        = document.getElementById("roomModal");
+  const roomModalTitle   = document.getElementById("roomModalTitle");
+  const roomError        = document.getElementById("roomError");
+  const tabJoin          = document.getElementById("tabJoin");
+  const tabCreate        = document.getElementById("tabCreate");
+  const paneJoin         = document.getElementById("paneJoin");
+  const paneCreate       = document.getElementById("paneCreate");
+  const joinCodeInput    = document.getElementById("joinCodeInput");
+  const joinPasswordWrap = document.getElementById("joinPasswordWrap");
+  const joinPasswordInput= document.getElementById("joinPasswordInput");
+  const joinRoomBtn      = document.getElementById("joinRoomBtn");
+  const createNameInput  = document.getElementById("createNameInput");
+  const createPasswordInput = document.getElementById("createPasswordInput");
+  const createRoomBtn    = document.getElementById("createRoomBtn");
+  const inviteBar        = document.getElementById("inviteBar");
+  const inviteGroupName  = document.getElementById("inviteGroupName");
+  const recentGroupsWrap = document.getElementById("recentGroupsWrap");
+  const recentGroupsList = document.getElementById("recentGroupsList");
+  const createSuccessBox = document.getElementById("createSuccessBox");
+  const successGroupName = document.getElementById("successGroupName");
+  const successCode      = document.getElementById("successCode");
+  const successLinkInput = document.getElementById("successLinkInput");
+  const copyLinkBtn      = document.getElementById("copyLinkBtn");
+  const enterGroupBtn    = document.getElementById("enterGroupBtn");
+
   const app             = document.getElementById("app");
   const chatWindow      = document.getElementById("chatWindow");
   const onlineList      = document.getElementById("onlineList");
@@ -1013,6 +1516,9 @@
   const sendBtn         = document.getElementById("sendBtn");
   const attachBtn       = document.getElementById("attachBtn");
   const fileInput       = document.getElementById("fileInput");
+  const emojiBtn        = document.getElementById("emojiBtn");
+  const emojiPicker     = document.getElementById("emojiPicker");
+  const emojiGrid       = document.getElementById("emojiGrid");
   const dropZone        = document.getElementById("dropZone");
   const attachPreviewBar   = document.getElementById("attachPreviewBar");
   const attachPreviewName  = document.getElementById("attachPreviewName");
@@ -1048,6 +1554,19 @@
   const bgLayer         = document.getElementById("bgLayer");
   const themeGrid       = document.getElementById("themeGrid");
   const clearChatLabel  = document.getElementById("clearChatLabel");
+  const chatHeaderTitle = document.getElementById("chatHeaderTitle");
+  const chatHeaderSubtitle = document.getElementById("chatHeaderSubtitle");
+  const membersModal    = document.getElementById("membersModal");
+  const membersModalSub = document.getElementById("membersModalSub");
+  const membersList     = document.getElementById("membersList");
+  const membersEmpty    = document.getElementById("membersEmpty");
+  const closeMembersBtn = document.getElementById("closeMembersBtn");
+  const roomTitle       = document.getElementById("roomTitle");
+  const sidebarGroupName= document.getElementById("sidebarGroupName");
+  const sidebarGroupCode= document.getElementById("sidebarGroupCode");
+  const shareGroupBtn   = document.getElementById("shareGroupBtn");
+  const switchGroupBtn  = document.getElementById("switchGroupBtn");
+  const toast           = document.getElementById("toast");
 
   // Call UI elements
   const callBtn          = document.getElementById("callBtn");
@@ -1060,29 +1579,74 @@
   const switchCamBtn     = document.getElementById("switchCamBtn");
   const endCallBtn       = document.getElementById("endCallBtn");
 
-  // Change this to whatever username should have admin rights.
-  // NOTE: since this app has no login/password, this is a soft check —
-  // anyone who types this exact name gets admin powers. Fine for a
-  // small trusted group; combine with a password prompt for real
-  // groups (ask if you'd like that added).
-  const ADMIN_USERNAME = "admin";
-
   let username = "";
   let isAdmin = false;
+  let currentRoom = null; // { code, name }
   let selectedFile = null;
   let socket = null;
   let typingTimeout = null;
   let replyingTo = null; // { id, username, text, attachmentType }
+  let pendingInviteCode = ""; // agar URL me ?room=CODE aaya ho
+  let currentOnlineUsers = [];
+  let currentCallParticipants = [];
 
   // Sender ke apne bheje attachment ko turant (bina dobara download kiye)
   // dikhane ke liye local blob URLs cache karte hain.
   const pendingBlobs = new Map(); // clientTempId -> blobUrl
 
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
+  }
+
+  // =================================================================
+  //  Auth screens (naam + group) ka animated slideshow background
+  // =================================================================
+  const AUTH_BG_IMAGES = [
+    "https://i.pinimg.com/736x/a1/36/8b/a1368b94a90922d5d6cd698d2a8ab162.jpg",
+    "https://i.pinimg.com/736x/63/fe/98/63fe983295a840388de9e264d257454d.jpg",
+    "https://i.pinimg.com/736x/ef/2f/69/ef2f699d2d6237aa2a183a4eb2890f44.jpg",
+    "https://i.pinimg.com/474x/e4/fb/2b/e4fb2b64ee6a34717dc8e9c50c01a0d2.jpg",
+    "https://img.magnific.com/premium-photo/midnight-blue-sky-landscape-outdoors-nature_53876-378331.jpg?semt=ais_hybrid&w=740&q=80",
+    "https://img.magnific.com/premium-photo/viral-anime-nature-wallpaper-4k-quality_1165818-1231.jpg?semt=ais_hybrid&w=740&q=80",
+    "https://img.magnific.com/premium-photo/beautiful-scenery-of-mountain-and-lake_1165818-1230.jpg?semt=ais_hybrid&w=740&q=80",
+  ];
+  const authBgSlideA = document.getElementById("authBgSlideA");
+  const authBgSlideB = document.getElementById("authBgSlideB");
+  const authBgEl = document.getElementById("authBg");
+  let authBgTimer = null;
+  let authBgIndex = 0;
+  let authBgShowingA = true;
+
+  function startAuthBgSlideshow() {
+    if (authBgTimer) return; // already running
+    authBgSlideA.style.backgroundImage = `url("${AUTH_BG_IMAGES[0]}")`;
+    authBgSlideA.style.opacity = "1";
+    authBgIndex = 1 % AUTH_BG_IMAGES.length;
+    authBgShowingA = true;
+    authBgTimer = setInterval(() => {
+      const nextUrl = AUTH_BG_IMAGES[authBgIndex];
+      const showEl = authBgShowingA ? authBgSlideB : authBgSlideA;
+      const hideEl = authBgShowingA ? authBgSlideA : authBgSlideB;
+      showEl.style.backgroundImage = `url("${nextUrl}")`;
+      showEl.style.opacity = "1";
+      hideEl.style.opacity = "0";
+      authBgShowingA = !authBgShowingA;
+      authBgIndex = (authBgIndex + 1) % AUTH_BG_IMAGES.length;
+    }, 5000);
+  }
+  function stopAuthBgSlideshow() {
+    clearInterval(authBgTimer);
+    authBgTimer = null;
+    authBgEl.classList.add("hide");
+  }
+  startAuthBgSlideshow();
+
   // ---------------------------------------------------------------
-  // Background themes. "url: null" = default gradient (no image).
-  // Selection syncs for everyone if the server relays 'setBackground'
-  // / 'backgroundChanged' events (see SERVER-SETUP.md). Until then it
-  // still works locally for you via localStorage.
+  // Background themes for IN-CHAT background (alag feature — ye sirf
+  // chat khulne ke baad sidebar se control hota hai).
   // ---------------------------------------------------------------
   const THEMES = [
   {
@@ -1155,21 +1719,24 @@
     document.querySelectorAll(".themeSwatch").forEach((el) => {
       el.classList.toggle("active", (el.dataset.url || "") === (url || ""));
     });
-    try { localStorage.setItem("chatBackground", url || ""); } catch (e) {}
+    // Background ab per-group hai — isliye group-specific key me save karte hain
+    if (currentRoom) {
+      try { localStorage.setItem("chatBackground:" + currentRoom.code, url || ""); } catch (e) {}
+    }
     if (emit && socket) socket.emit("setBackground", url || null);
   }
 
   function initBackground() {
     buildThemeGrid();
-    let saved = null;
-    try { saved = localStorage.getItem("chatBackground"); } catch (e) {}
-    if (saved === null) {
-      applyBackground(DEFAULT_THEME_URL, false);
-    } else {
-      applyBackground(saved || null, false);
-    }
   }
   initBackground();
+
+  function applyBackgroundForCurrentRoom(serverUrl) {
+    // Server jo bhejta hai wahi source-of-truth hai (sab group members
+    // ke liye sync rehta hai); local cache sirf turant-turant dikhane
+    // ke liye hai jab tak server confirm na kare.
+    applyBackground(serverUrl, false);
+  }
 
   // ---- Unread / live new-message tracking ----
   let unreadCount = 0;
@@ -1230,17 +1797,6 @@
 
   // ---------------------------------------------------------------
   // Desktop/browser notifications for new messages.
-  // Works while this tab is open (foreground or backgrounded/minimised).
-  // IMPORTANT: on Android Chrome (and most mobile browsers) a plain
-  // `new Notification(...)` silently does nothing -- notifications there
-  // MUST go through a Service Worker's showNotification(). We register
-  // one below and use it everywhere, with a desktop-only fallback.
-  // Also: Notifications + Service Workers only work on HTTPS (or
-  // localhost) -- plain http:// on a real domain will not work at all,
-  // regardless of this code.
-  // For real push notifications when the browser itself is fully
-  // closed, Web Push (VAPID keys + server) is needed on top of this --
-  // ask if you want that added too.
   // ---------------------------------------------------------------
   let notificationsEnabled = false;
   try { notificationsEnabled = localStorage.getItem("chatNotifyEnabled") === "1"; } catch (e) {}
@@ -1335,7 +1891,7 @@
         ? (message.attachment.type === "image" ? "Photo bheji" : message.attachment.type === "video" ? "Video bheji" : (message.attachment.name || "File bheji"))
         : "Naya message";
 
-    showAppNotification(message.username, {
+    showAppNotification(`${message.username} — ${currentRoom ? currentRoom.name : "Chat"}`, {
       body,
       tag: "chat-" + message.id,
       icon: "/favicon.ico",
@@ -1344,10 +1900,6 @@
   }
 
   // ---- Mobile keyboard-aware viewport handling ----
-  // Chat panels are sized off the *visual* viewport (not the layout
-  // viewport), so the keyboard opening never hides the header or the
-  // top of the chat -- the whole app just shrinks to what's actually
-  // visible, the way native chat apps behave.
   function applyViewportHeight() {
     const vv = window.visualViewport;
     const h = vv ? vv.height : window.innerHeight;
@@ -1376,63 +1928,270 @@
     setTimeout(() => { scrollToBottom(); applyViewportHeight(); }, 250);
   });
 
-  function join(name) {
-    const finalName = (name || usernameInput.value).trim();
+  // =================================================================
+  //  STEP 1: Naam entry
+  // =================================================================
+  function goToUsernameStep() {
+    usernameModal.classList.remove("hide");
+    roomModal.classList.add("hide");
+  }
+
+  function submitUsername() {
+    const finalName = usernameInput.value.trim();
     if (!finalName) {
       usernameInput.focus();
       return;
     }
     username = finalName;
-    isAdmin = username.toLowerCase() === ADMIN_USERNAME.toLowerCase();
-    localStorage.setItem("chatUsername", username);
-    usernameModal.style.display = "none";
-    app.classList.add("visible");
-    userBadge.textContent = username;
-    updateClearChatLabel();
-    initSocket();
+    try { localStorage.setItem("chatUsername", username); } catch (e) {}
+    goToRoomStep();
   }
 
-  function updateClearChatLabel() {
-    clearChatLabel.textContent = isAdmin ? "Sabke Liye Chat Clear Karein" : "Apna Chat Clear Karein";
-    clearChatBtn.title = isAdmin
-      ? "Ye sabke liye aur database se bhi permanently delete karega"
-      : "Sirf aapki taraf se clear hoga, doosron ko messages dikhte rahenge";
-  }
-
-  joinBtn.addEventListener("click", () => join());
+  joinBtn.addEventListener("click", submitUsername);
   usernameInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") join();
+    if (e.key === "Enter") submitUsername();
   });
 
-  userBadge.addEventListener("click", () => {
-    const ok = confirm("Kya aap apna naam badalna chahte hain? (Chat se dobara connect hoga)");
-    if (!ok) return;
-    if (inCall) endCall();
-    if (socket) socket.disconnect();
-    localStorage.removeItem("chatUsername");
-    location.reload();
-  });
+  // =================================================================
+  //  STEP 2: Group home screen (create / join)
+  // =================================================================
+  function getRecentGroups() {
+    try {
+      const raw = localStorage.getItem("recentGroups");
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function saveRecentGroup(code, name) {
+    try {
+      let list = getRecentGroups().filter((g) => g.code !== code);
+      list.unshift({ code, name });
+      list = list.slice(0, 8);
+      localStorage.setItem("recentGroups", JSON.stringify(list));
+    } catch (e) {}
+  }
+  function renderRecentGroups() {
+    const list = getRecentGroups();
+    if (!list.length) {
+      recentGroupsWrap.style.display = "none";
+      return;
+    }
+    recentGroupsWrap.style.display = "block";
+    recentGroupsList.innerHTML = "";
+    list.forEach((g) => {
+      const el = document.createElement("div");
+      el.className = "recentGroupItem";
+      el.innerHTML = `
+        <div class="recentGroupAvatar">${escapeHtml((g.name || "?").trim().charAt(0).toUpperCase())}</div>
+        <div class="recentGroupInfo">
+          <div class="recentGroupName">${escapeHtml(g.name || g.code)}</div>
+          <div class="recentGroupCode">${escapeHtml(g.code)}</div>
+        </div>
+      `;
+      el.addEventListener("click", () => {
+        joinCodeInput.value = g.code;
+        switchRoomTab("join");
+        attemptJoinPrecheck(g.code);
+      });
+      recentGroupsList.appendChild(el);
+    });
+  }
 
-  window.addEventListener("DOMContentLoaded", () => {
-    const saved = localStorage.getItem("chatUsername");
-    if (saved) {
-      usernameInput.value = saved;
-      join(saved);
+  function switchRoomTab(which) {
+    createSuccessBox.classList.remove("show");
+    roomError.classList.remove("show");
+    if (which === "join") {
+      tabJoin.classList.add("active");
+      tabCreate.classList.remove("active");
+      paneJoin.classList.add("active");
+      paneCreate.classList.remove("active");
+    } else {
+      tabCreate.classList.add("active");
+      tabJoin.classList.remove("active");
+      paneCreate.classList.add("active");
+      paneJoin.classList.remove("active");
+    }
+  }
+  tabJoin.addEventListener("click", () => switchRoomTab("join"));
+  tabCreate.addEventListener("click", () => switchRoomTab("create"));
+
+  function showRoomError(msg) {
+    roomError.textContent = msg;
+    roomError.classList.add("show");
+  }
+  function clearRoomError() {
+    roomError.classList.remove("show");
+  }
+
+  function goToRoomStep() {
+    usernameModal.classList.add("hide");
+    roomModal.classList.remove("hide");
+    roomModalTitle.textContent = `Namaste, ${username}!`;
+    renderRecentGroups();
+
+    if (pendingInviteCode) {
+      joinCodeInput.value = pendingInviteCode;
+      switchRoomTab("join");
+      attemptJoinPrecheck(pendingInviteCode);
+    }
+  }
+
+  // Invite link se aaye code ka pehle se preview dikhana (group ka
+  // naam pata chal jaaye, password chahiye ya nahi ye bhi)
+  async function attemptJoinPrecheck(code) {
+    clearRoomError();
+    inviteBar.classList.remove("show");
+    joinPasswordWrap.classList.remove("show");
+    try {
+      const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (data.error) {
+        showRoomError(data.error);
+        return;
+      }
+      inviteGroupName.textContent = data.name;
+      inviteBar.classList.add("show");
+      if (data.hasPassword) joinPasswordWrap.classList.add("show");
+    } catch (e) {
+      // Chup rehna theek hai — join button dabane pe fir se try hoga
+    }
+  }
+
+  joinCodeInput.addEventListener("input", () => {
+    joinCodeInput.value = joinCodeInput.value.toUpperCase();
+  });
+  let precheckTimer = null;
+  joinCodeInput.addEventListener("input", () => {
+    clearTimeout(precheckTimer);
+    const val = joinCodeInput.value.trim();
+    if (val.length === 6) {
+      precheckTimer = setTimeout(() => attemptJoinPrecheck(val), 300);
+    } else {
+      inviteBar.classList.remove("show");
+      joinPasswordWrap.classList.remove("show");
     }
   });
 
-  function initSocket() {
+  async function doJoinRoom() {
+    const code = joinCodeInput.value.trim().toUpperCase();
+    const password = joinPasswordInput.value;
+    if (!code || code.length < 4) {
+      showRoomError("Sahi group code daalein.");
+      return;
+    }
+    clearRoomError();
+    joinRoomBtn.disabled = true;
+    joinRoomBtn.textContent = "Connect ho raha hai...";
+    connectAndJoinRoom(code, password, (err) => {
+      joinRoomBtn.disabled = false;
+      joinRoomBtn.innerHTML = 'Group Join Karein <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      if (err) showRoomError(err);
+    });
+  }
+  joinRoomBtn.addEventListener("click", doJoinRoom);
+  joinCodeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doJoinRoom(); });
+  joinPasswordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doJoinRoom(); });
+
+  let lastCreatedRoom = null; // { code, name }
+
+  async function doCreateRoom() {
+    const name = createNameInput.value.trim();
+    if (!name) {
+      showRoomError("Group ka naam daalein.");
+      return;
+    }
+    clearRoomError();
+    createRoomBtn.disabled = true;
+    createRoomBtn.textContent = "Bana rahe hain...";
+    try {
+      const res = await fetch("/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, password: createPasswordInput.value, username }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        showRoomError(data.error);
+        return;
+      }
+      lastCreatedRoom = { code: data.code, name: data.name };
+      successGroupName.textContent = `"${data.name}" ban gaya!`;
+      successCode.textContent = data.code;
+      successLinkInput.value = `${location.origin}${location.pathname}?room=${data.code}`;
+      paneCreate.classList.remove("active");
+      paneJoin.classList.remove("active");
+      createSuccessBox.classList.add("show");
+    } catch (err) {
+      showRoomError("Group banane me dikkat aayi: " + err.message);
+    } finally {
+      createRoomBtn.disabled = false;
+      createRoomBtn.innerHTML = 'Group Banayein <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+    }
+  }
+  createRoomBtn.addEventListener("click", doCreateRoom);
+  createNameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doCreateRoom(); });
+
+  copyLinkBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(successLinkInput.value);
+      showToast("Link copy ho gaya!");
+    } catch (e) {
+      successLinkInput.select();
+      document.execCommand("copy");
+      showToast("Link copy ho gaya!");
+    }
+  });
+
+  enterGroupBtn.addEventListener("click", () => {
+    if (!lastCreatedRoom) return;
+    createSuccessBox.classList.remove("show");
+    connectAndJoinRoom(lastCreatedRoom.code, createPasswordInput.value, (err) => {
+      if (err) showRoomError(err);
+    });
+  });
+
+  // =================================================================
+  //  Socket connect + join a room
+  // =================================================================
+  function ensureSocket() {
+    if (socket) return;
     socket = io();
-    socket.emit("join", username);
 
     socket.on("chatHistory", (messages) => {
       chatWindow.innerHTML = "";
-      const clearedAt = getLocalClearedAt();
-      messages
-        .filter((m) => !clearedAt || new Date(m.timestamp).getTime() > clearedAt)
-        .forEach((m) => renderMessage(m));
+      messages.forEach((m) => renderMessage(m));
       scrollToBottom();
       updateScrollControls();
+    });
+
+    socket.on("roomJoined", ({ code, name, isAdmin: admin }) => {
+      currentRoom = { code, name };
+      isAdmin = !!admin;
+      currentCallParticipants = [];
+      updateCallBadge(0);
+      saveRecentGroup(code, name);
+      try { localStorage.setItem("lastRoomCode", code); } catch (e) {}
+
+      roomTitle.textContent = name;
+      sidebarGroupName.textContent = name;
+      sidebarGroupCode.textContent = code;
+      updateClearChatLabel();
+
+      stopAuthBgSlideshow();
+      usernameModal.classList.add("hide");
+      roomModal.classList.add("hide");
+      app.classList.add("visible");
+
+      // History load hote hi background bhi aayega (backgroundChanged event)
+      let saved = null;
+      try { saved = localStorage.getItem("chatBackground:" + code); } catch (e) {}
+      if (saved) applyBackground(saved || null, false); // turant local se dikhado, server confirm karega
+    });
+
+    socket.on("joinError", (msg) => {
+      roomModal.classList.remove("hide");
+      showRoomError(msg);
+      joinRoomBtn.disabled = false;
+      joinRoomBtn.innerHTML = 'Group Join Karein <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
     });
 
     socket.on("chatMessage", (message) => {
@@ -1481,15 +2240,15 @@
       typingIndicator.textContent = "";
     });
 
-    // Optional: only fires once the server implements it (see SERVER-SETUP.md).
-    // Keeps the anime background in sync for every connected user.
     socket.on("backgroundChanged", (url) => {
-      applyBackground(url || null, false);
+      applyBackgroundForCurrentRoom(url || null);
     });
 
     // ---- Group call events ----
     socket.on("callParticipants", (list) => {
-      updateCallBadge(list.length);
+      currentCallParticipants = list || [];
+      updateCallBadge(currentCallParticipants.length);
+      if (!membersModal.classList.contains("hide")) renderMembersModal();
     });
 
     socket.on("call:existingParticipants", (list) => {
@@ -1498,8 +2257,6 @@
     });
 
     socket.on("call:userJoined", ({ username: joinedName }) => {
-      // Naya banda khud offer bhejega existing sabko, hume sirf wait
-      // karna hai uska "call:signal" (offer) aane ka.
       renderSystemMessage(`${joinedName} call me shamil ho gaye`);
     });
 
@@ -1509,6 +2266,149 @@
       removeCallTile(socketId);
       closePeer(socketId);
     });
+  }
+
+  function connectAndJoinRoom(code, password, cb) {
+    ensureSocket();
+    if (inCall) endCall();
+    const onJoined = () => {
+      socket.off("roomJoined", onJoined);
+      socket.off("joinError", onError);
+      // Successfully join hua — is group ka password (agar tha) yaad rakh lo
+      // taaki refresh ke baad automatically wapas isi group me connect ho sake.
+      try { localStorage.setItem("roomPassword:" + code, password || ""); } catch (e) {}
+      cb && cb(null);
+    };
+    const onError = (msg) => {
+      socket.off("roomJoined", onJoined);
+      socket.off("joinError", onError);
+      cb && cb(msg);
+    };
+    socket.once("roomJoined", onJoined);
+    socket.once("joinError", onError);
+    socket.emit("join", { username, roomCode: code, password: password || "" });
+  }
+
+  // Refresh ke baad seedha wapas usi group me le jaane ki koshish —
+  // room modal ek "connecting" state me dikhta hai jab tak reply na aa jaaye.
+  function attemptAutoRejoin(code) {
+    usernameModal.classList.add("hide");
+    roomModal.classList.remove("hide");
+    roomModalTitle.textContent = `Namaste, ${username}!`;
+    clearRoomError();
+    switchRoomTab("join");
+    createSuccessBox.classList.remove("show");
+    joinCodeInput.value = code;
+    inviteBar.classList.remove("show");
+    joinPasswordWrap.classList.remove("show");
+    renderRecentGroups();
+
+    joinRoomBtn.disabled = true;
+    joinRoomBtn.textContent = "Wapas connect ho rahe hain...";
+
+    let savedPassword = "";
+    try { savedPassword = localStorage.getItem("roomPassword:" + code) || ""; } catch (e) {}
+
+    connectAndJoinRoom(code, savedPassword, (err) => {
+      joinRoomBtn.disabled = false;
+      joinRoomBtn.innerHTML = 'Group Join Karein <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      if (err) {
+        // Password badal gaya ho ya group delete ho gaya ho — user ko
+        // manually try karne dete hain, room list already dikh rahi hai.
+        showRoomError(err);
+      }
+    });
+  }
+
+  // =================================================================
+  //  Boot sequence: URL me ?room=CODE hai kya? saved username hai kya?
+  //  saved room hai kya (refresh ke baad wapas usi me jaane ke liye)?
+  // =================================================================
+  window.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(location.search);
+    pendingInviteCode = (params.get("room") || "").toUpperCase().trim();
+
+    let savedUsername = "";
+    try { savedUsername = localStorage.getItem("chatUsername") || ""; } catch (e) {}
+
+    let lastRoomCode = "";
+    try { lastRoomCode = localStorage.getItem("lastRoomCode") || ""; } catch (e) {}
+
+    if (pendingInviteCode) {
+      usernameSub.textContent = "Aapko chat me invite kiya gaya hai — shamil hone ke liye apna naam daalein";
+    }
+
+    if (savedUsername) {
+      username = savedUsername;
+      usernameInput.value = savedUsername;
+      if (pendingInviteCode) {
+        // Explicit invite link hamesha priority leta hai, chahe pehle se
+        // kisi aur group me the.
+        goToRoomStep();
+      } else if (lastRoomCode) {
+        attemptAutoRejoin(lastRoomCode);
+      } else {
+        goToRoomStep();
+      }
+    } else {
+      goToUsernameStep();
+      usernameInput.focus();
+    }
+  });
+
+  userBadge.addEventListener("click", () => {
+    const ok = confirm("Kya aap apna naam badalna chahte hain? (Chat se dobara connect hoga)");
+    if (!ok) return;
+    if (inCall) endCall();
+    if (socket) socket.disconnect();
+    try { localStorage.removeItem("chatUsername"); } catch (e) {}
+    location.reload();
+  });
+
+  // Header ka group naam bhi dabane se "Switch Group" jaisa hi kaam kare
+  chatHeaderTitle.addEventListener("click", () => openSwitchGroup());
+  switchGroupBtn.addEventListener("click", () => openSwitchGroup());
+
+  function openSwitchGroup() {
+    if (inCall) endCall();
+    if (socket) socket.emit("leaveRoom");
+    app.classList.remove("visible");
+    closeSidebar();
+    authBgEl.classList.remove("hide");
+    startAuthBgSlideshow();
+    roomModal.classList.remove("hide");
+    createSuccessBox.classList.remove("show");
+    switchRoomTab("join");
+    joinCodeInput.value = "";
+    joinPasswordInput.value = "";
+    clearRoomError();
+    inviteBar.classList.remove("show");
+    joinPasswordWrap.classList.remove("show");
+    renderRecentGroups();
+  }
+
+  shareGroupBtn.addEventListener("click", async () => {
+    if (!currentRoom) return;
+    const link = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: currentRoom.name, text: `${username} ne aapko "${currentRoom.name}" group me invite kiya hai`, url: link });
+        return;
+      }
+    } catch (e) { /* user ne cancel kiya, chup rehna theek hai */ }
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast("Invite link copy ho gaya!");
+    } catch (e) {
+      showToast("Link: " + link);
+    }
+  });
+
+  function updateClearChatLabel() {
+    clearChatLabel.textContent = isAdmin ? "Sabke Liye Chat Clear Karein" : "Apna Chat Clear Karein";
+    clearChatBtn.title = isAdmin
+      ? "Ye sabke liye aur database se bhi permanently delete karega"
+      : "Sirf aapki taraf se clear hoga, doosron ko messages dikhte rahenge";
   }
 
   function formatTime(isoString) {
@@ -1655,10 +2555,6 @@
   }
 
   // ---- Swipe-to-reply ----
-  // Own bubbles sit on the right, so they swipe left; other people's
-  // bubbles sit on the left, so they swipe right -- both gestures pull
-  // the bubble toward the centre of the screen, which is what feels
-  // natural with one thumb on mobile.
   function attachSwipeToReply(div, message, isOwn) {
     const bubble = div.querySelector(".bubbleContent");
     const indicator = div.querySelector(".replyIndicator");
@@ -1716,13 +2612,57 @@
   }
 
   function renderOnlineUsers(users) {
+    currentOnlineUsers = users || [];
     onlineList.innerHTML = "";
-    users.forEach((u) => {
+    currentOnlineUsers.forEach((u) => {
       const li = document.createElement("li");
       li.textContent = u;
       onlineList.appendChild(li);
     });
+    updateHeaderSubtitle();
+    if (!membersModal.classList.contains("hide")) renderMembersModal();
   }
+
+  function updateHeaderSubtitle() {
+    const n = currentOnlineUsers.length;
+    chatHeaderSubtitle.textContent = n === 1 ? "1 online" : `${n} online`;
+  }
+
+  function renderMembersModal() {
+    const n = currentOnlineUsers.length;
+    membersModalSub.textContent = n === 1 ? "1 online" : `${n} online`;
+    membersList.innerHTML = "";
+    membersEmpty.style.display = n ? "none" : "block";
+    currentOnlineUsers.forEach((name) => {
+      const inCallNow = currentCallParticipants.includes(name);
+      const el = document.createElement("div");
+      el.className = "memberItem";
+      el.innerHTML = `
+        <div class="memberAvatar">${escapeHtml(personInitial(name))}</div>
+        <div class="memberInfo">
+          <div class="memberName">${escapeHtml(name)}${name === username ? " (Aap)" : ""}</div>
+          <div class="memberStatus${inCallNow ? " inCall" : ""}">${inCallNow ? "🎥 Call me hai" : "Online"}</div>
+        </div>
+      `;
+      membersList.appendChild(el);
+    });
+  }
+
+  function openMembersModal() {
+    renderMembersModal();
+    membersModal.classList.remove("hide");
+  }
+  function closeMembersModal() {
+    membersModal.classList.add("hide");
+  }
+  chatHeaderSubtitle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openMembersModal();
+  });
+  closeMembersBtn.addEventListener("click", closeMembersModal);
+  membersModal.addEventListener("click", (e) => {
+    if (e.target === membersModal) closeMembersModal();
+  });
 
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -1770,6 +2710,7 @@
   async function sendMessage() {
     const text = msgInput.value.trim();
     if (!text && !selectedFile) return;
+    if (!currentRoom) return;
 
     let attachment = null;
     let clientTempId = null;
@@ -1823,10 +2764,54 @@
     if (e.key === "Enter") sendMessage();
   });
   msgInput.addEventListener("input", () => {
-    if (!socket) return;
+    if (!socket || !currentRoom) return;
     socket.emit("typing", username);
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => socket.emit("stopTyping"), 1200);
+  });
+
+  // ---- Emoji picker ----
+  const EMOJI_LIST = [
+    "😀","😁","😂","🤣","😊","😍","😘","😜","🤔","😎",
+    "😢","😭","😡","🥳","😴","🙄","😇","🤗","😏","🤩",
+    "👍","👎","🙏","👏","🔥","❤️","💯","✨","🎉","💀",
+    "😱","🤯","🥺","😅","😆","🤪","😬","🤝","👋","💪",
+  ];
+  function buildEmojiGrid() {
+    emojiGrid.innerHTML = "";
+    EMOJI_LIST.forEach((em) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = em;
+      b.addEventListener("click", () => insertEmoji(em));
+      emojiGrid.appendChild(b);
+    });
+  }
+  buildEmojiGrid();
+
+  function insertEmoji(em) {
+    const start = msgInput.selectionStart ?? msgInput.value.length;
+    const end = msgInput.selectionEnd ?? msgInput.value.length;
+    msgInput.value = msgInput.value.slice(0, start) + em + msgInput.value.slice(end);
+    const cursor = start + em.length;
+    msgInput.focus();
+    msgInput.setSelectionRange(cursor, cursor);
+  }
+
+  function toggleEmojiPicker() {
+    emojiPicker.classList.toggle("show");
+  }
+  function closeEmojiPicker() {
+    emojiPicker.classList.remove("show");
+  }
+  emojiBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleEmojiPicker();
+  });
+  document.addEventListener("click", (e) => {
+    if (emojiPicker.classList.contains("show") && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+      closeEmojiPicker();
+    }
   });
 
   // ---- Attachments (any file / photo / video) ----
@@ -1858,6 +2843,7 @@
   ["dragenter", "dragover"].forEach((evt) => {
     document.addEventListener(evt, (e) => {
       e.preventDefault();
+      if (!app.classList.contains("visible")) return;
       dropZone.classList.add("showZone", "active");
     });
   });
@@ -1874,36 +2860,21 @@
   });
   document.addEventListener("drop", (e) => {
     e.preventDefault();
+    if (!app.classList.contains("visible")) return;
     const files = e.dataTransfer.files;
     if (files.length > 0) setSelectedFile(files[0]);
   });
 
-  // ---- Clear chat: admin = global (server + database), everyone
-  // else = local view only (their device stays clear even after
-  // refresh, but nobody else's chat is touched). ----
-  function getLocalClearedAt() {
-    try {
-      const v = localStorage.getItem("chatClearedAt");
-      return v ? Number(v) : 0;
-    } catch (e) { return 0; }
-  }
-  function setLocalClearedAt(ts) {
-    try { localStorage.setItem("chatClearedAt", String(ts)); } catch (e) {}
-  }
-
+  // ---- Clear chat (is group ka admin hi kar sakta hai — server verify karta hai) ----
   clearChatBtn.addEventListener("click", () => {
+    if (!currentRoom) return;
     if (isAdmin) {
-      if (confirm("Ye chat SABKE liye aur database se bhi permanently delete kar dega. Pakka?")) {
+      if (confirm("Ye is GROUP ka poora chat sabke liye aur database se bhi permanently delete kar dega. Pakka?")) {
         socket.emit("clearChat");
       }
       return;
     }
-    if (confirm("Sirf aapki taraf se chat clear hogi. Doosron ko messages dikhte rahenge. Aage badhein?")) {
-      setLocalClearedAt(Date.now());
-      chatWindow.innerHTML = "";
-      renderSystemMessage("Aapka chat view clear kar diya gaya hai");
-      updateScrollControls();
-    }
+    showToast("Sirf group admin hi chat clear kar sakta hai.");
   });
 
   function openSidebar() {
@@ -2000,20 +2971,8 @@
 
   // =================================================================
   //  GROUP VOICE/VIDEO CALL (WebRTC mesh, signaling via Socket.IO)
-  // =================================================================
-  //
-  //  - Har participant har doosre participant se DIRECT connection
-  //    banata hai (mesh). 2-4 logon ke liye ye best/simplest approach
-  //    hai, aur audio/video kabhi server se hokar nahi jaata.
-  //  - STUN sirf usually kaam karta hai jab dono log NAT ke peeche
-  //    hon jo "predictable" ho. Mobile carrier networks (jio/airtel
-  //    4G/5G) zyada tar Carrier-Grade NAT (CGNAT) / symmetric NAT use
-  //    karte hain, jaha STUN fail ho jaata hai — is wajah se TURN
-  //    server MUST HAVE hai jab log alag-alag network (wifi + mobile
-  //    data) pe hon, jaisa aapne bataya.
-  //  - Yahan Open Relay Project ka FREE public TURN diya hai testing
-  //    ke liye. Production/heavy use ke liye apna TURN lena behtar
-  //    hoga (metered.ca free tier, ya khud coturn host karo VPS pe).
+  //  — ab har group/room ke andar hi scoped hai, doosre group ki call
+  //  kabhi dikhegi ya sunai nahi degi.
   // =================================================================
 
   const ICE_SERVERS = [
@@ -2139,7 +3098,7 @@
   }
 
   async function startCall() {
-    if (inCall) return;
+    if (inCall || !currentRoom) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Ye browser call feature support nahi karta.");
       return;
@@ -2173,7 +3132,7 @@
     if (!inCall) return;
     inCall = false;
     callBtn.classList.remove("active");
-    socket.emit("call:leave");
+    if (socket) socket.emit("call:leave");
 
     peers.forEach((pc) => pc.close());
     peers.clear();
@@ -2209,7 +3168,6 @@
     setLocalCamVisualState();
   });
 
-  // Mobile pe front/back camera switch (agar dono available hon)
   switchCamBtn.addEventListener("click", async () => {
     if (!localStream) return;
     facingMode = facingMode === "user" ? "environment" : "user";
@@ -2218,8 +3176,6 @@
       const newTrack = newStream.getVideoTracks()[0];
       const oldTrack = localStream.getVideoTracks()[0];
 
-      // Sabhi active peer connections me track replace karo (renegotiation
-      // ki zaroorat nahi padti addTrack/removeTrack se, sirf ek clean swap)
       peers.forEach((pc) => {
         const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
         if (sender) sender.replaceTrack(newTrack);

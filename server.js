@@ -4,16 +4,25 @@
  *  Express + Socket.IO + Cloudinary (media) + MongoDB (chat data)
  * ================================================================
  *  Features:
- *   - Realtime chat (Socket.IO)
+ *   - Multiple independent groups/rooms — har group ka apna unique
+ *     code (aur chahe to password), "+" se naya group banao, code/
+ *     invite-link se doosre group me join karo
+ *   - Realtime chat (Socket.IO), scoped per-room
  *   - File / photo / video upload -> stored on Cloudinary
  *   - Reply-to-message (like WhatsApp/Telegram)
- *   - Messages permanently saved in MongoDB
- *   - Online users list
- *   - Delete / clear chat (also removes Cloudinary media) - admin only
- *   - Custom chat background (persisted to disk, broadcast to everyone)
+ *   - Messages permanently saved in MongoDB (roomId ke saath)
+ *   - Online users list — per room
+ *   - Delete / clear chat (also removes Cloudinary media) - room
+ *     admin (jisne group banaya) ya global admin ke liye
+ *   - Custom chat background per room (persisted to disk, broadcast)
  *   - Timestamps
- *   - Group voice/video calling (WebRTC mesh, 2-4 log, signaling yahi se)
+ *   - Group voice/video calling (WebRTC mesh, 2-4 log, per-room)
  * ================================================================
+ *
+ *  NOTE on room passwords: ye ek casual "shared join code" jaisa hai
+ *  (jaise WhatsApp group invite link), production-grade security
+ *  nahi hai — plaintext compare hota hai. Agar real security chahiye
+ *  (bcrypt hashing waghera) to bata dena, add kar denge.
  */
 
 require("dotenv").config();
@@ -30,20 +39,24 @@ const fs = require("fs");
 
 const SETTINGS_FILE = path.join(__dirname, "settings.json");
 
+// settings ab { [roomCode]: backgroundUrl } shape ka object hai —
+// har group ki apni background choice alag se yaad rehti hai.
 function loadSettings() {
   try {
     return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
   } catch (e) {
-    return { background: null };
+    return {};
   }
 }
 function saveSettings(settings) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
 
-let settings = loadSettings();
+let roomBackgrounds = loadSettings(); // { roomCode: url|null }
 
-// Username jo chat clear karne ki permission rakhta hai (case-insensitive match)
+// Ye username hamesha HAR group me admin rahega (super-admin), chahe
+// usne wo group banaya ho ya nahi. Isके alawa, jisne group banaya wo
+// khud-ba-khud USI group ka admin ban jaata hai.
 const ADMIN_USERNAME = "admin";
 
 // ---------------------------------------------------------------
@@ -77,10 +90,23 @@ mongoose
   .catch((err) => console.error("❌ MongoDB connection error:", err.message));
 
 // ---------------------------------------------------------------
-// Message schema
+// Room (group) schema
+// ---------------------------------------------------------------
+const roomSchema = new mongoose.Schema({
+  code: { type: String, required: true, unique: true, index: true }, // e.g. "K7QX2P"
+  name: { type: String, required: true },
+  password: { type: String, default: "" }, // "" = koi password nahi
+  createdBy: { type: String, default: "" }, // is group ka admin
+  createdAt: { type: Date, default: Date.now },
+});
+const Room = mongoose.model("Room", roomSchema);
+
+// ---------------------------------------------------------------
+// Message schema (ab roomId ke saath scoped)
 // ---------------------------------------------------------------
 const messageSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true },
+  roomId: { type: String, required: true, index: true },
   username: { type: String, required: true },
   text: { type: String, default: "" },
   attachment: {
@@ -158,22 +184,83 @@ function deleteFromCloudinary(publicId, resourceType) {
     .catch((err) => console.error("Cloudinary delete error:", err.message));
 }
 
-async function clearAllMessagesAndMedia() {
-  const all = await Message.find({ "attachment.publicId": { $ne: null } }).lean();
+async function clearRoomMessagesAndMedia(roomCode) {
+  const all = await Message.find({ roomId: roomCode, "attachment.publicId": { $ne: null } }).lean();
   await Promise.all(
     all.map((m) => deleteFromCloudinary(m.attachment.publicId, resourceTypeFor(m.attachment.type)))
   );
-  await Message.deleteMany({});
+  await Message.deleteMany({ roomId: roomCode });
+}
+
+// ---------------------------------------------------------------
+// Room helpers
+// ---------------------------------------------------------------
+const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0/O, 1/I) hataye
+
+function generateRoomCode() {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+  }
+  return code;
+}
+
+async function createUniqueRoomCode() {
+  // Bahut kam chance hai clash ka (6 chars, 33 options = 33^6), lekin
+  // fir bhi retry loop laga rahe hain taaki guarantee rahe.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateRoomCode();
+    const exists = await Room.exists({ code });
+    if (!exists) return code;
+  }
+  throw new Error("Room code generate nahi ho paya, dobara try karein.");
+}
+
+async function isRoomAdmin(username, roomCode) {
+  if (!username) return false;
+  if (username.toLowerCase() === ADMIN_USERNAME.toLowerCase()) return true;
+  const room = await Room.findOne({ code: roomCode }).lean();
+  return !!(room && room.createdBy && room.createdBy.toLowerCase() === username.toLowerCase());
 }
 
 // ---------------------------------------------------------------
 // REST Routes
 // ---------------------------------------------------------------
 
-// Get all chat messages (initial load / fallback)
+// Naya group banao
+app.post("/api/rooms", async (req, res) => {
+  try {
+    const name = (req.body.name || "").trim().slice(0, 40) || "Group Chat";
+    const password = (req.body.password || "").trim().slice(0, 40);
+    const createdBy = (req.body.username || "").trim().slice(0, 20);
+    const code = await createUniqueRoomCode();
+    await Room.create({ code, name, password, createdBy });
+    res.json({ code, name, hasPassword: !!password });
+  } catch (err) {
+    console.error("Room create error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Group ka basic info check karo (join screen ke liye — password khud
+// nahi bhejte, sirf ye batate hain ki chahiye ya nahi)
+app.get("/api/rooms/:code", async (req, res) => {
+  try {
+    const code = (req.params.code || "").toUpperCase().trim();
+    const room = await Room.findOne({ code }).lean();
+    if (!room) return res.status(404).json({ error: "Group nahi mila. Code check karein." });
+    res.json({ code: room.code, name: room.name, hasPassword: !!room.password });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all chat messages of a room (initial load / fallback)
 app.get("/api/messages", async (req, res) => {
   try {
-    const messages = await Message.find().sort({ timestamp: 1 }).lean();
+    const roomCode = (req.query.room || "").toUpperCase().trim();
+    if (!roomCode) return res.status(400).json({ error: "room code chahiye" });
+    const messages = await Message.find({ roomId: roomCode }).sort({ timestamp: 1 }).lean();
     res.json(messages);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -205,17 +292,20 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// Clear entire chat (DB + Cloudinary media) — requires ?username=admin
-// NOTE: REST route ke paas socket jaisa "logged in user" context nahi hota,
-// isliye admin username query param se pass karwaya jaa raha hai.
+// Poore group ka chat clear karo (DB + Cloudinary media) — sirf us
+// group ke admin ya global admin. ?room=CODE&username=admin
 app.delete("/api/messages", async (req, res) => {
-  const requester = (req.query.username || "").toLowerCase();
-  if (requester !== ADMIN_USERNAME.toLowerCase()) {
-    return res.status(403).json({ error: "Sirf admin hi chat clear kar sakta hai." });
-  }
   try {
-    await clearAllMessagesAndMedia();
-    io.emit("chatCleared");
+    const roomCode = (req.query.room || "").toUpperCase().trim();
+    const requester = (req.query.username || "").trim();
+    if (!roomCode) return res.status(400).json({ error: "room code chahiye" });
+
+    const allowed = await isRoomAdmin(requester, roomCode);
+    if (!allowed) {
+      return res.status(403).json({ error: "Sirf group admin hi chat clear kar sakta hai." });
+    }
+    await clearRoomMessagesAndMedia(roomCode);
+    io.to(roomCode).emit("chatCleared");
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -227,11 +317,12 @@ app.delete("/api/messages/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const msg = await Message.findOne({ id });
-    if (msg?.attachment?.publicId) {
+    if (!msg) return res.json({ success: true });
+    if (msg.attachment?.publicId) {
       await deleteFromCloudinary(msg.attachment.publicId, resourceTypeFor(msg.attachment.type));
     }
     await Message.deleteOne({ id });
-    io.emit("messageDeleted", id);
+    io.to(msg.roomId).emit("messageDeleted", id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -240,57 +331,136 @@ app.delete("/api/messages/:id", async (req, res) => {
 
 // ---------------------------------------------------------------
 // Socket.IO - realtime chat + online users + group call signaling
+// Sab kuch ab per-room (Socket.IO rooms use karte hain via
+// socket.join(roomCode)) — ek group ki koi bhi cheez doosre group me
+// kabhi nahi dikhti.
 // ---------------------------------------------------------------
-const onlineUsers = new Map(); // socket.id -> username
-const callParticipants = new Map(); // socket.id -> username (jo call me hain)
+const roomOnlineUsers = new Map(); // roomCode -> Map(socketId -> username)
+const roomCallParticipants = new Map(); // roomCode -> Map(socketId -> username)
 
-function broadcastOnlineUsers() {
-  io.emit("onlineUsers", Array.from(onlineUsers.values()));
+function broadcastOnlineUsers(roomCode) {
+  const map = roomOnlineUsers.get(roomCode);
+  io.to(roomCode).emit("onlineUsers", map ? Array.from(map.values()) : []);
 }
 
-function broadcastCallParticipants() {
-  io.emit("callParticipants", Array.from(callParticipants.values()));
+function broadcastCallParticipants(roomCode) {
+  const map = roomCallParticipants.get(roomCode);
+  io.to(roomCode).emit("callParticipants", map ? Array.from(map.values()) : []);
 }
 
 io.on("connection", (socket) => {
   console.log(`🔌 New connection: ${socket.id}`);
+  socket.data.roomCode = null;
+  socket.data.username = null;
 
-  let currentUsername = null;
+  // Ek socket ko uske current group se nikaal ke sab jagah se saaf
+  // karta hai — naya group join karne se pehle, ya disconnect pe.
+  function leaveCurrentRoom() {
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
 
-  socket.on("join", async (username) => {
-    currentUsername = username;
-    onlineUsers.set(socket.id, username);
-    broadcastOnlineUsers();
+    socket.leave(roomCode);
 
+    const onlineMap = roomOnlineUsers.get(roomCode);
+    if (onlineMap) {
+      onlineMap.delete(socket.id);
+      broadcastOnlineUsers(roomCode);
+    }
+
+    const callMap = roomCallParticipants.get(roomCode);
+    if (callMap && callMap.has(socket.id)) {
+      callMap.delete(socket.id);
+      socket.to(roomCode).emit("call:userLeft", socket.id);
+      broadcastCallParticipants(roomCode);
+    }
+
+    if (socket.data.username) {
+      socket.to(roomCode).emit("systemMessage", `${socket.data.username} chat se chala gaya 🚪`);
+    }
+
+    socket.data.roomCode = null;
+  }
+
+  // payload: { username, roomCode, password }
+  socket.on("join", async (payload) => {
+    const username = (payload?.username || "").trim().slice(0, 20);
+    const roomCode = (payload?.roomCode || "").toUpperCase().trim();
+    const password = payload?.password || "";
+
+    if (!username || !roomCode) {
+      socket.emit("joinError", "Naam aur group code dono chahiye.");
+      return;
+    }
+
+    let room;
     try {
-      const history = await Message.find().sort({ timestamp: 1 }).lean();
-      socket.emit("chatHistory", history);
+      room = await Room.findOne({ code: roomCode }).lean();
+    } catch (err) {
+      socket.emit("joinError", "Server se connect nahi ho paaya, dobara try karein.");
+      return;
+    }
+    if (!room) {
+      socket.emit("joinError", "Ye group nahi mila. Code check karein.");
+      return;
+    }
+    if (room.password && room.password !== password) {
+      socket.emit("joinError", "Password galat hai.");
+      return;
+    }
+
+    // Agar pehle se kisi group me tha (group switch kar raha hai), pehle
+    // wahan se cleanly nikal jao.
+    leaveCurrentRoom();
+
+    socket.join(roomCode);
+    socket.data.roomCode = roomCode;
+    socket.data.username = username;
+
+    if (!roomOnlineUsers.has(roomCode)) roomOnlineUsers.set(roomCode, new Map());
+    roomOnlineUsers.get(roomCode).set(socket.id, username);
+    broadcastOnlineUsers(roomCode);
+
+    let history = [];
+    try {
+      history = await Message.find({ roomId: roomCode }).sort({ timestamp: 1 }).lean();
     } catch (err) {
       console.error("MongoDB read error:", err.message);
-      socket.emit("chatHistory", []);
+    }
+    socket.emit("chatHistory", history);
+
+    const admin = await isRoomAdmin(username, roomCode);
+    socket.emit("roomJoined", { code: room.code, name: room.name, isAdmin: admin });
+
+    // Is group ki current background bhej do
+    socket.emit("backgroundChanged", roomBackgrounds[roomCode] || null);
+
+    // Agar is group me call already chal rahi hai, naye aane wale ko batao
+    const callMap = roomCallParticipants.get(roomCode);
+    if (callMap && callMap.size > 0) {
+      socket.emit("callParticipants", Array.from(callMap.values()));
     }
 
-    // Naye user ko current background bhi bhej do
-    socket.emit("backgroundChanged", settings.background);
+    socket.to(roomCode).emit("systemMessage", `${username} chat me aa gaya/gayi hai 👋`);
+  });
 
-    // Agar call already chal rahi hai to naye user ko batao (join button
-    // ke saath "N log call me hain" jaisa UI dikhane ke kaam aata hai)
-    if (callParticipants.size > 0) {
-      socket.emit("callParticipants", Array.from(callParticipants.values()));
-    }
-
-    socket.broadcast.emit("systemMessage", `${username} chat me aa gaya/gayi hai 👋`);
+  // User ne "Switch Group" dabaya — current group chhodo, socket connected
+  // rahega, client dobara "join" bhejega jab naya group choose karega.
+  socket.on("leaveRoom", () => {
+    leaveCurrentRoom();
   });
 
   // New chat message (text and/or attachment, optionally a reply)
   socket.on("chatMessage", async (payload) => {
-    // payload: { username, text, attachment, clientTempId, replyTo }
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return; // kisi group me nahi hai, ignore
+
     const id = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const timestamp = new Date();
 
     const messageDoc = {
       id,
-      username: payload.username || "Anonymous",
+      roomId: roomCode,
+      username: payload.username || socket.data.username || "Anonymous",
       text: payload.text || "",
       attachment: payload.attachment || null,
       replyTo: payload.replyTo
@@ -312,27 +482,28 @@ io.on("connection", (socket) => {
     // clientTempId sirf realtime round-trip ke liye hai (taaki sender apna
     // hi bheja hua attachment local blob se turant dekh sake) - DB me save
     // nahi hota, isliye broadcast karte waqt alag se jodte hain.
-    io.emit("chatMessage", { ...messageDoc, clientTempId: payload.clientTempId || null });
+    io.to(roomCode).emit("chatMessage", { ...messageDoc, clientTempId: payload.clientTempId || null });
   });
 
-  // payload: { id, username } — username batata hai kisne delete karne ki
-  // koshish ki, taaki hum verify kar sakein ki woh sirf apna hi message
-  // delete kar raha hai (ya woh admin hai).
+  // payload: { id, username }
   socket.on("deleteMessage", async (payload) => {
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+
     const id = typeof payload === "string" ? payload : payload?.id;
-    const requester = typeof payload === "object" ? payload?.username : null;
+    const requester = typeof payload === "object" ? payload?.username : socket.data.username;
     if (!id) return;
 
     try {
-      const msg = await Message.findOne({ id });
-      if (!msg) return; // pehle se delete ho chuka / exist nahi karta
+      const msg = await Message.findOne({ id, roomId: roomCode });
+      if (!msg) return; // pehle se delete ho chuka / exist nahi karta / doosre room ka hai
 
       const isOwner = requester && msg.username === requester;
-      const isAdminUser = requester && requester.toLowerCase() === ADMIN_USERNAME.toLowerCase();
+      const isAdminUser = await isRoomAdmin(requester, roomCode);
 
       if (!isOwner && !isAdminUser) {
         socket.emit("systemMessage", "Aap sirf apna message delete kar sakte hain.");
-        return; // koi bhi doosre ka message delete nahi kar sakta
+        return;
       }
 
       if (msg.attachment?.publicId) {
@@ -343,89 +514,99 @@ io.on("connection", (socket) => {
       console.error("MongoDB delete error:", err.message);
       return;
     }
-    io.emit("messageDeleted", id);
+    io.to(roomCode).emit("messageDeleted", id);
   });
 
-  // Sirf admin hi poora chat clear kar sakta hai
+  // Sirf is group ka admin (creator) ya global admin poora chat clear kar sakta hai
   socket.on("clearChat", async () => {
-    if (!currentUsername || currentUsername.toLowerCase() !== ADMIN_USERNAME.toLowerCase()) {
-      socket.emit("systemMessage", "Sirf admin hi chat clear kar sakta hai.");
-      return; // silently ignore — koi bhi non-admin isko trigger nahi kar sakta
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+
+    const allowed = await isRoomAdmin(socket.data.username, roomCode);
+    if (!allowed) {
+      socket.emit("systemMessage", "Sirf group admin hi chat clear kar sakta hai.");
+      return;
     }
     try {
-      await clearAllMessagesAndMedia();
+      await clearRoomMessagesAndMedia(roomCode);
     } catch (err) {
       console.error("MongoDB clear error:", err.message);
     }
-    io.emit("chatCleared");
+    io.to(roomCode).emit("chatCleared");
   });
 
-  // Chat background badalna (sabke liye persist + broadcast)
+  // Chat background badalna (is group ke sabke liye persist + broadcast)
   socket.on("setBackground", (url) => {
-    settings.background = url || null;
-    saveSettings(settings); // disk par persist (server restart ke baad bhi yaad rahega)
-    io.emit("backgroundChanged", settings.background); // sabko turant broadcast
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+    roomBackgrounds[roomCode] = url || null;
+    saveSettings(roomBackgrounds); // disk par persist (server restart ke baad bhi yaad rahega)
+    io.to(roomCode).emit("backgroundChanged", roomBackgrounds[roomCode]);
   });
 
   socket.on("typing", (username) => {
-    socket.broadcast.emit("userTyping", username);
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+    socket.to(roomCode).emit("userTyping", username);
   });
   socket.on("stopTyping", () => {
-    socket.broadcast.emit("userStopTyping");
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+    socket.to(roomCode).emit("userStopTyping");
   });
 
   // ---------------------------------------------------------------
-  // Group voice/video call signaling (WebRTC mesh).
+  // Group voice/video call signaling (WebRTC mesh) — per room.
   // Server sirf messages relay karta hai (offer/answer/ICE candidates) -
   // actual audio/video stream kabhi server se hokar nahi jaata, seedha
   // browser-se-browser jaata hai. 2-4 logon ke liye ye kaafi hai.
   // ---------------------------------------------------------------
   socket.on("call:join", () => {
-    if (!currentUsername) return;
+    const roomCode = socket.data.roomCode;
+    const username = socket.data.username;
+    if (!roomCode || !username) return;
+
+    if (!roomCallParticipants.has(roomCode)) roomCallParticipants.set(roomCode, new Map());
+    const callMap = roomCallParticipants.get(roomCode);
 
     // Naye joiner ko batao ki call me pehle se kaun kaun hai, taaki
     // woh un sabko offer bhej sake.
-    const existing = Array.from(callParticipants.entries())
+    const existing = Array.from(callMap.entries())
       .filter(([id]) => id !== socket.id)
       .map(([id, name]) => ({ socketId: id, username: name }));
     socket.emit("call:existingParticipants", existing);
 
-    callParticipants.set(socket.id, currentUsername);
-    socket.broadcast.emit("call:userJoined", { socketId: socket.id, username: currentUsername });
-    broadcastCallParticipants();
+    callMap.set(socket.id, username);
+    socket.to(roomCode).emit("call:userJoined", { socketId: socket.id, username });
+    broadcastCallParticipants(roomCode);
   });
 
   // payload: { to: socketId, data: { sdp } | { candidate } }
-  // Point-to-point relay — sirf jisko bheja gaya hai wahi receive karta hai.
+  // Point-to-point relay — sirf jisko bheja gaya hai wahi receive karta hai,
+  // aur sirf tabhi jab dono same room me hon.
   socket.on("call:signal", ({ to, data }) => {
-    if (!to || !data) return;
-    io.to(to).emit("call:signal", { from: socket.id, username: currentUsername, data });
+    const roomCode = socket.data.roomCode;
+    if (!roomCode || !to || !data) return;
+
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!targetSocket || targetSocket.data.roomCode !== roomCode) return;
+
+    targetSocket.emit("call:signal", { from: socket.id, username: socket.data.username, data });
   });
 
   socket.on("call:leave", () => {
-    if (callParticipants.has(socket.id)) {
-      callParticipants.delete(socket.id);
-      socket.broadcast.emit("call:userLeft", socket.id);
-      broadcastCallParticipants();
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return;
+    const callMap = roomCallParticipants.get(roomCode);
+    if (callMap && callMap.has(socket.id)) {
+      callMap.delete(socket.id);
+      socket.to(roomCode).emit("call:userLeft", socket.id);
+      broadcastCallParticipants(roomCode);
     }
   });
 
   socket.on("disconnect", () => {
-    const username = onlineUsers.get(socket.id);
-    onlineUsers.delete(socket.id);
-    broadcastOnlineUsers();
-
-    // Agar disconnect hone wala call me tha, baaki participants ko batao
-    // taaki unki taraf se bhi peer connection clean up ho jaye.
-    if (callParticipants.has(socket.id)) {
-      callParticipants.delete(socket.id);
-      socket.broadcast.emit("call:userLeft", socket.id);
-      broadcastCallParticipants();
-    }
-
-    if (username) {
-      io.emit("systemMessage", `${username} chat se chala gaya 🚪`);
-    }
+    leaveCurrentRoom();
     console.log(`❌ Disconnected: ${socket.id}`);
   });
 });
