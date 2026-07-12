@@ -2178,6 +2178,11 @@
       saveRecentGroup(code, name);
       try { localStorage.setItem("lastRoomCode", code); } catch (e) {}
 
+      // ✅ ADD THESE 3 LINES — URL se ?room= hata do taaki refresh pe
+      // ye "invite link" na samjha jaaye, seedha auto-rejoin ho jaaye
+      pendingInviteCode = "";
+      try { history.replaceState(null, "", location.pathname); } catch (e) {}
+
       roomTitle.textContent = name;
       sidebarGroupName.textContent = name;
       sidebarGroupCode.textContent = code;
@@ -2194,6 +2199,7 @@
       if (saved) applyBackground(saved || null, false); // turant local se dikhado, server confirm karega
     });
 
+    
     socket.on("joinError", (msg) => {
       roomModal.classList.remove("hide");
       showRoomError(msg);
