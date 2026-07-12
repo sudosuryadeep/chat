@@ -104,7 +104,7 @@
       #ckDisplay {
         display: none;
         flex: 1 1 60px;
-        mmin-width: 60px;
+        min-width: 60px;
         padding: 12px 16px;
         border-radius: 24px;
         border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
