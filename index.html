@@ -2199,7 +2199,7 @@
       if (saved) applyBackground(saved || null, false); // turant local se dikhado, server confirm karega
     });
 
-    
+
     socket.on("joinError", (msg) => {
       roomModal.classList.remove("hide");
       showRoomError(msg);
@@ -2254,8 +2254,27 @@
     });
 
     socket.on("backgroundChanged", (url) => {
-      applyBackgroundForCurrentRoom(url || null);
-    });
+  if (url) {
+    // Server ke paas is group ka koi background pehle se saved hai — wahi lagao
+    applyBackgroundForCurrentRoom(url);
+    return;
+  }
+
+  // Server null bhej raha hai — matlab is group me kabhi koi background
+  // set hi nahi hua. Check karo local me user ne khud "No Background"
+  // chuna tha ya nahi (agar chuna tha toh usi ko respect karo).
+  let saved = null;
+  try { saved = localStorage.getItem("chatBackground:" + (currentRoom ? currentRoom.code : "")); } catch (e) {}
+
+  if (saved === null) {
+    // Bilkul naya group, kabhi kuch set nahi hua — default theme lagao
+    // aur server ko bhi bata do taaki group ke baaki members ko bhi dikhe.
+    applyBackground(DEFAULT_THEME_URL, true);
+  } else {
+    // User ne pehle khud "No Background" chuna tha ("" saved hai) — usi ko respect karo
+    applyBackgroundForCurrentRoom(null);
+  }
+});
 
     // ---- Group call events ----
     socket.on("callParticipants", (list) => {
