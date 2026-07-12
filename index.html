@@ -636,6 +636,38 @@
   }
   #chatHeader span#userBadge:hover { background: rgba(255,255,255,0.08); }
 
+
+
+  .memberItem { justify-content: space-between; }
+.removeMemberBtn {
+  margin-left: 8px;
+  background: rgba(251,113,133,0.12);
+  border: 1px solid rgba(251,113,133,0.3);
+  color: var(--danger);
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.removeMemberBtn svg { width: 15px; height: 15px; }
+.removeMemberBtn:hover { background: rgba(251,113,133,0.22); }
+
+#adminToolsSection { display: none; margin-bottom: 20px; }
+#adminToolsSection label {
+  display: block; font-size: 12px; color: var(--text-muted);
+  font-weight: 600; margin-bottom: 6px;
+}
+#adminToolsSection input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--glass-border); background: rgba(255,255,255,0.06);
+  color: var(--text-light); font-family: var(--font); font-size: 14px;
+  margin-bottom: 8px; outline: none;
+}
+#changeCodeInput { text-transform: uppercase; letter-spacing: 0.08em; }
+#adminToolsSection .btn { margin-bottom: 16px; padding: 10px; font-size: 13px; }
+
+
   /* ---------- Search bar ---------- */
   #searchBar {
     display: none;
@@ -860,14 +892,19 @@
 
   /* ---------- Scroll controls ---------- */
   #scrollControls {
-    position: absolute;
-    right: 14px;
-    bottom: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 50;
-  }
+  position: absolute;
+  right: 14px;
+  top: 14px;      /* bottom: 14px hata do */
+  bottom: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+#scrollControls.active { opacity: 1; pointer-events: auto; }
   .scrollBtn {
     width: 40px; height: 40px;
     border-radius: 50%;
@@ -1351,6 +1388,17 @@
         </div>
       </div>
 
+      <div id="adminToolsSection">
+  <h2><span class="titleGroup">Admin Tools</span></h2>
+  <label for="renameGroupInput">Group ka Naam</label>
+  <input type="text" id="renameGroupInput" maxlength="40" />
+  <button class="btn secondary" id="renameGroupBtn">Naam Save Karein</button>
+
+  <label for="changeCodeInput">Group ID</label>
+  <input type="text" id="changeCodeInput" maxlength="10" />
+  <button class="btn secondary" id="changeCodeBtn">ID Save Karein</button>
+</div>
+
       <h2>
         <span class="titleGroup"><span class="dot"></span> Online</span>
         <button id="sidebarCloseBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -1574,6 +1622,11 @@
   const shareGroupBtn   = document.getElementById("shareGroupBtn");
   const switchGroupBtn  = document.getElementById("switchGroupBtn");
   const toast           = document.getElementById("toast");
+  const adminToolsSection = document.getElementById("adminToolsSection");
+const renameGroupInput  = document.getElementById("renameGroupInput");
+const renameGroupBtn    = document.getElementById("renameGroupBtn");
+const changeCodeInput   = document.getElementById("changeCodeInput");
+const changeCodeBtn     = document.getElementById("changeCodeBtn");
 
   // Call UI elements
   const callBtn          = document.getElementById("callBtn");
@@ -1802,6 +1855,22 @@
     if (isNearBottom()) clearUnread();
   });
 
+
+  let scrollHideTimer = null;
+const scrollControlsEl = document.getElementById("scrollControls");
+
+function pingScrollControls() {
+  scrollControlsEl.classList.add("active");
+  clearTimeout(scrollHideTimer);
+  scrollHideTimer = setTimeout(() => scrollControlsEl.classList.remove("active"), 1400);
+}
+
+chatWindow.addEventListener("scroll", () => {
+  if (isNearBottom() && !document.hidden) clearUnread();
+  updateScrollControls();
+  pingScrollControls();
+});
+
   // ---------------------------------------------------------------
   // Desktop/browser notifications for new messages.
   // ---------------------------------------------------------------
@@ -1905,6 +1974,27 @@
       data: { messageId: message.id },
     });
   }
+
+  renameGroupInput.addEventListener("input", () => {});
+renameGroupBtn.addEventListener("click", () => {
+  const newName = renameGroupInput.value.trim();
+  if (!newName) return;
+  socket.emit("renameGroup", { newName });
+});
+
+changeCodeInput.addEventListener("input", () => {
+  changeCodeInput.value = changeCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+});
+changeCodeBtn.addEventListener("click", () => {
+  const newCode = changeCodeInput.value.trim();
+  if (!newCode || newCode.length < 4) {
+    showToast("Kam se kam 4 characters ki ID likhein.");
+    return;
+  }
+  if (confirm(`Group ID "${newCode}" set karna chahte hain? Purana code/link kaam karna band ho jaayega.`)) {
+    socket.emit("changeGroupCode", { newCode });
+  }
+});
 
   // ---- Mobile keyboard-aware viewport handling ----
   function applyViewportHeight() {
@@ -2163,12 +2253,81 @@
     if (socket) return;
     socket = io();
 
+    socket.on("connect", () => {
+  reconnectOverlay.style.display = "none";
+  if (currentRoom) {
+    let savedPassword = "";
+    try { savedPassword = localStorage.getItem("roomPassword:" + currentRoom.code) || ""; } catch (e) {}
+    // wapas usi group me silently re-join, taaki online list/history turant sync ho
+    socket.emit("join", { username, roomCode: currentRoom.code, password: savedPassword });
+  }
+});
+
+socket.on("disconnect", () => {
+  if (currentRoom) {
+    reconnectOverlay.style.display = "flex"; // wahi spinner jo boot pe use hota hai
+  }
+});
+
     socket.on("chatHistory", (messages) => {
       chatWindow.innerHTML = "";
       messages.forEach((m) => renderMessage(m));
       scrollToBottom();
       updateScrollControls();
     });
+
+
+
+    socket.on("kicked", ({ by }) => {
+  alert(`Aapko admin (${by}) ne is group se remove kar diya hai.`);
+  if (inCall) endCall();
+  try { localStorage.removeItem("lastRoomCode"); } catch (e) {}
+  app.classList.remove("visible");
+  closeSidebar();
+  closeMembersModal();
+  authBgEl.classList.remove("hide");
+  startAuthBgSlideshow();
+  roomModal.classList.remove("hide");
+  switchRoomTab("join");
+  joinCodeInput.value = "";
+  clearRoomError();
+  renderRecentGroups();
+  currentRoom = null;
+});
+
+socket.on("roomUpdated", ({ code, name }) => {
+  if (!currentRoom || currentRoom.code !== code) return;
+  currentRoom.name = name;
+  roomTitle.textContent = name;
+  sidebarGroupName.textContent = name;
+  renameGroupInput.value = name;
+  saveRecentGroup(code, name);
+});
+
+socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
+  if (!currentRoom || currentRoom.code !== oldCode) return;
+
+  try {
+    const pw = localStorage.getItem("roomPassword:" + oldCode);
+    if (pw !== null) {
+      localStorage.setItem("roomPassword:" + newCode, pw);
+      localStorage.removeItem("roomPassword:" + oldCode);
+    }
+    const bg = localStorage.getItem("chatBackground:" + oldCode);
+    if (bg !== null) {
+      localStorage.setItem("chatBackground:" + newCode, bg);
+      localStorage.removeItem("chatBackground:" + oldCode);
+    }
+    localStorage.setItem("lastRoomCode", newCode);
+  } catch (e) {}
+
+  currentRoom.code = newCode;
+  sidebarGroupCode.textContent = newCode;
+  changeCodeInput.value = newCode;
+  saveRecentGroup(newCode, currentRoom.name);
+  showToast("Group ID badal kar " + newCode + " ho gayi");
+});
+
 
     socket.on("roomJoined", ({ code, name, isAdmin: admin }) => {
       currentRoom = { code, name };
@@ -2187,6 +2346,10 @@
       sidebarGroupName.textContent = name;
       sidebarGroupCode.textContent = code;
       updateClearChatLabel();
+
+      adminToolsSection.style.display = isAdmin ? "block" : "none";
+      renameGroupInput.value = name;
+      changeCodeInput.value = code;
 
       stopAuthBgSlideshow();
       usernameModal.classList.add("hide");
@@ -2596,53 +2759,53 @@
 
   // ---- Swipe-to-reply ----
   function attachSwipeToReply(div, message, isOwn) {
-    const bubble = div.querySelector(".bubbleContent");
-    const indicator = div.querySelector(".replyIndicator");
-    const THRESHOLD = 56;
-    const MAX = 80;
-    let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, isHorizontal = false;
+  const bubble = div.querySelector(".bubbleContent");
+  const indicator = div.querySelector(".replyIndicator");
+  const THRESHOLD = 56;
+  const MAX = 80;
+  let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, isHorizontal = false;
 
-    function onDown(e) {
-      const p = e.touches ? e.touches[0] : e;
-      startX = p.clientX; startY = p.clientY; dx = 0;
-      dragging = true; decided = false; isHorizontal = false;
-    }
-    function onMove(e) {
-      if (!dragging) return;
-      const p = e.touches ? e.touches[0] : e;
-      const rawDx = p.clientX - startX;
-      const rawDy = p.clientY - startY;
-
-      if (!decided) {
-        if (Math.abs(rawDx) > 8 || Math.abs(rawDy) > 8) {
-          isHorizontal = Math.abs(rawDx) > Math.abs(rawDy);
-          decided = true;
-        } else return;
-      }
-      if (!isHorizontal) return;
-
-      const allowed = isOwn ? rawDx < 0 : rawDx > 0;
-      dx = allowed ? Math.max(-MAX, Math.min(MAX, rawDx)) : 0;
-      if (e.cancelable) e.preventDefault();
-      bubble.style.transform = `translateX(${dx}px)`;
-      indicator.style.opacity = Math.min(1, Math.abs(dx) / THRESHOLD);
-    }
-    function onUp() {
-      if (!dragging) return;
-      dragging = false;
-      bubble.style.transition = "transform 0.2s ease";
-      bubble.style.transform = "translateX(0)";
-      indicator.style.opacity = 0;
-      setTimeout(() => { bubble.style.transition = ""; }, 200);
-      if (Math.abs(dx) >= THRESHOLD) setReplyingTo(message);
-      dx = 0;
-    }
-
-    div.addEventListener("touchstart", onDown, { passive: true });
-    div.addEventListener("touchmove", onMove, { passive: false });
-    div.addEventListener("touchend", onUp);
-    div.addEventListener("touchcancel", onUp);
+  function onDown(e) {
+    startX = e.clientX; startY = e.clientY; dx = 0;
+    dragging = true; decided = false; isHorizontal = false;
+    div.setPointerCapture(e.pointerId);
   }
+  function onMove(e) {
+    if (!dragging) return;
+    const rawDx = e.clientX - startX;
+    const rawDy = e.clientY - startY;
+
+    if (!decided) {
+      if (Math.abs(rawDx) > 8 || Math.abs(rawDy) > 8) {
+        isHorizontal = Math.abs(rawDx) > Math.abs(rawDy);
+        decided = true;
+      } else return;
+    }
+    if (!isHorizontal) return;
+
+    const allowed = isOwn ? rawDx < 0 : rawDx > 0;
+    dx = allowed ? Math.max(-MAX, Math.min(MAX, rawDx)) : 0;
+    bubble.style.transform = `translateX(${dx}px)`;
+    indicator.style.opacity = Math.min(1, Math.abs(dx) / THRESHOLD);
+  }
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    try { div.releasePointerCapture(e.pointerId); } catch (err) {}
+    bubble.style.transition = "transform 0.2s ease";
+    bubble.style.transform = "translateX(0)";
+    indicator.style.opacity = 0;
+    setTimeout(() => { bubble.style.transition = ""; }, 200);
+    if (Math.abs(dx) >= THRESHOLD) setReplyingTo(message);
+    dx = 0;
+  }
+
+  div.addEventListener("pointerdown", onDown);
+  div.addEventListener("pointermove", onMove);
+  div.addEventListener("pointerup", onUp);
+  div.addEventListener("pointercancel", onUp);
+}
+
 
   function renderSystemMessage(text) {
     const div = document.createElement("div");
@@ -2669,24 +2832,34 @@
   }
 
   function renderMembersModal() {
-    const n = currentOnlineUsers.length;
-    membersModalSub.textContent = n === 1 ? "1 online" : `${n} online`;
-    membersList.innerHTML = "";
-    membersEmpty.style.display = n ? "none" : "block";
-    currentOnlineUsers.forEach((name) => {
-      const inCallNow = currentCallParticipants.includes(name);
-      const el = document.createElement("div");
-      el.className = "memberItem";
-      el.innerHTML = `
-        <div class="memberAvatar">${escapeHtml(personInitial(name))}</div>
-        <div class="memberInfo">
-          <div class="memberName">${escapeHtml(name)}${name === username ? " (Aap)" : ""}</div>
-          <div class="memberStatus${inCallNow ? " inCall" : ""}">${inCallNow ? "🎥 Call me hai" : "Online"}</div>
-        </div>
-      `;
-      membersList.appendChild(el);
-    });
-  }
+  const n = currentOnlineUsers.length;
+  membersModalSub.textContent = n === 1 ? "1 online" : `${n} online`;
+  membersList.innerHTML = "";
+  membersEmpty.style.display = n ? "none" : "block";
+  currentOnlineUsers.forEach((name) => {
+    const inCallNow = currentCallParticipants.includes(name);
+    const canRemove = isAdmin && name !== username;
+    const el = document.createElement("div");
+    el.className = "memberItem";
+    el.innerHTML = `
+      <div class="memberAvatar">${escapeHtml(personInitial(name))}</div>
+      <div class="memberInfo">
+        <div class="memberName">${escapeHtml(name)}${name === username ? " (Aap)" : ""}</div>
+        <div class="memberStatus${inCallNow ? " inCall" : ""}">${inCallNow ? "🎥 Call me hai" : "Online"}</div>
+      </div>
+      ${canRemove ? `<button class="removeMemberBtn" title="Group se remove karein">${TRASH_ICON}</button>` : ""}
+    `;
+    const removeBtn = el.querySelector(".removeMemberBtn");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", () => {
+        if (confirm(`${name} ko is group se remove karna chahte hain?`)) {
+          socket.emit("kickMember", { targetUsername: name });
+        }
+      });
+    }
+    membersList.appendChild(el);
+  });
+}
 
   function openMembersModal() {
     renderMembersModal();
@@ -3015,12 +3188,18 @@
   //  kabhi dikhegi ya sunai nahi degi.
   // =================================================================
 
-  const ICE_SERVERS = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
-  ];
+  let cachedIceServers = null;
+
+async function getIceServers() {
+  try {
+    const res = await fetch("/api/turn-credentials");
+    const servers = await res.json();
+    return [...servers, { urls: "stun:stun.l.google.com:19302" }];
+  } catch (err) {
+    console.error("TURN credentials fetch fail:", err);
+    return [{ urls: "stun:stun.l.google.com:19302" }];
+  }
+}
 
   let localStream = null;
   let inCall = false;
@@ -3081,7 +3260,7 @@
   }
 
   function createPeerConnection(socketId, remoteUsername) {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: cachedIceServers || [{ urls: "stun:stun.l.google.com:19302" }] });
     remoteNames.set(socketId, remoteUsername);
 
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
@@ -3146,6 +3325,9 @@
     if (location.protocol !== "https:" && location.hostname !== "localhost") {
       alert("Call sirf HTTPS site par kaam karti hai. Apni site ko HTTPS par host karein.");
       return;
+    }
+    if (!cachedIceServers) {
+      cachedIceServers = await getIceServers();
     }
 
     try {

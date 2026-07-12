@@ -535,6 +535,135 @@ io.on("connection", (socket) => {
     io.to(roomCode).emit("chatCleared");
   });
 
+
+  // ---- Member ko group se remove karna (sirf admin) ----
+socket.on("kickMember", async ({ targetUsername }) => {
+  const roomCode = socket.data.roomCode;
+  const requester = socket.data.username;
+  if (!roomCode || !targetUsername) return;
+
+  const allowed = await isRoomAdmin(requester, roomCode);
+  if (!allowed) {
+    socket.emit("systemMessage", "Sirf group admin hi kisi ko remove kar sakta hai.");
+    return;
+  }
+  if (targetUsername === requester) {
+    socket.emit("systemMessage", "Aap khud ko remove nahi kar sakte.");
+    return;
+  }
+
+  const onlineMap = roomOnlineUsers.get(roomCode);
+  if (!onlineMap) return;
+
+  const targets = [];
+  onlineMap.forEach((uname, sockId) => {
+    if (uname === targetUsername) targets.push(sockId);
+  });
+
+  targets.forEach((sockId) => {
+    const targetSocket = io.sockets.sockets.get(sockId);
+    if (targetSocket) {
+      targetSocket.emit("kicked", { by: requester });
+      targetSocket.leave(roomCode);
+      onlineMap.delete(sockId);
+
+      const callMap = roomCallParticipants.get(roomCode);
+      if (callMap && callMap.has(sockId)) {
+        callMap.delete(sockId);
+        socket.to(roomCode).emit("call:userLeft", sockId);
+        broadcastCallParticipants(roomCode);
+      }
+      targetSocket.data.roomCode = null;
+    }
+  });
+
+  broadcastOnlineUsers(roomCode);
+  io.to(roomCode).emit("systemMessage", `${targetUsername} ko group se hata diya gaya`);
+});
+
+// ---- Group ka naam badalna (sirf admin) ----
+socket.on("renameGroup", async ({ newName }) => {
+  const roomCode = socket.data.roomCode;
+  const requester = socket.data.username;
+  const name = (newName || "").trim().slice(0, 40);
+  if (!roomCode || !name) return;
+
+  const allowed = await isRoomAdmin(requester, roomCode);
+  if (!allowed) {
+    socket.emit("systemMessage", "Sirf group admin hi naam badal sakta hai.");
+    return;
+  }
+
+  try {
+    await Room.updateOne({ code: roomCode }, { name });
+  } catch (err) {
+    console.error("Rename error:", err.message);
+    return;
+  }
+  io.to(roomCode).emit("roomUpdated", { code: roomCode, name });
+  io.to(roomCode).emit("systemMessage", `Group ka naam badal kar "${name}" kar diya gaya`);
+});
+
+// ---- Group ki ID/code badalna (sirf admin) ----
+socket.on("changeGroupCode", async ({ newCode }) => {
+  const oldCode = socket.data.roomCode;
+  const requester = socket.data.username;
+  const code = (newCode || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+
+  if (!oldCode || !code || code.length < 4) {
+    socket.emit("systemMessage", "Sahi group ID daalein (kam se kam 4 characters).");
+    return;
+  }
+
+  const allowed = await isRoomAdmin(requester, oldCode);
+  if (!allowed) {
+    socket.emit("systemMessage", "Sirf group admin hi group ID badal sakta hai.");
+    return;
+  }
+  if (code === oldCode) return;
+
+  const exists = await Room.exists({ code });
+  if (exists) {
+    socket.emit("systemMessage", "Ye group ID pehle se use ho rahi hai. Doosri try karein.");
+    return;
+  }
+
+  try {
+    await Room.updateOne({ code: oldCode }, { code });
+    await Message.updateMany({ roomId: oldCode }, { roomId: code });
+  } catch (err) {
+    console.error("Code change error:", err.message);
+    socket.emit("systemMessage", "Group ID badalne me error aayi.");
+    return;
+  }
+
+  if (roomBackgrounds[oldCode] !== undefined) {
+    roomBackgrounds[code] = roomBackgrounds[oldCode];
+    delete roomBackgrounds[oldCode];
+    saveSettings(roomBackgrounds);
+  }
+
+  const onlineMap = roomOnlineUsers.get(oldCode);
+  if (onlineMap) {
+    roomOnlineUsers.set(code, onlineMap);
+    roomOnlineUsers.delete(oldCode);
+  }
+  const callMap = roomCallParticipants.get(oldCode);
+  if (callMap) {
+    roomCallParticipants.set(code, callMap);
+    roomCallParticipants.delete(oldCode);
+  }
+
+  const roomSockets = await io.in(oldCode).fetchSockets();
+  roomSockets.forEach((s) => {
+    s.join(code);
+    s.leave(oldCode);
+    s.data.roomCode = code;
+  });
+
+  io.to(code).emit("roomCodeChanged", { oldCode, newCode: code });
+});
+
   // Chat background badalna (is group ke sabke liye persist + broadcast)
   socket.on("setBackground", (url) => {
     const roomCode = socket.data.roomCode;
@@ -609,6 +738,26 @@ io.on("connection", (socket) => {
     leaveCurrentRoom();
     console.log(`❌ Disconnected: ${socket.id}`);
   });
+});
+
+
+// ---------------------------------------------------------------
+// TURN server credentials (Metered.ca) - client ko securely deta hai
+// ---------------------------------------------------------------
+const METERED_APP_DOMAIN = "aerivue.metered.live"; // <-- apna domain yahan daalo
+const METERED_API_KEY = "mjP8vHtOP0ORrpEiAm5Y0yqKMUYgUTDDXE24y0bmdDLxl72k";   // <-- apni API key yahan daalo
+
+app.get("/api/turn-credentials", async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://${METERED_APP_DOMAIN}/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
+    );
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error("TURN credentials fetch error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---------------------------------------------------------------
