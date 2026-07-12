@@ -103,8 +103,8 @@
          box instead of wrapping like real text. */
       #ckDisplay {
         display: none;
-        flex: 1;
-        min-width: 0;
+        flex: 1 1 60px;
+        mmin-width: 60px;
         padding: 12px 16px;
         border-radius: 24px;
         border: 1px solid var(--glass-border, rgba(255,255,255,0.1));

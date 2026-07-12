@@ -963,11 +963,14 @@
     align-items: center;
     flex-shrink: 0;
     background: rgba(255,255,255,0.02);
+    overflow-x: auto;          /* ADDED: overflow ho toh scroll ho, hide na ho */
+    scrollbar-width: none;     /* ADDED: firefox scrollbar chhupao */
   }
+  #inputBar::-webkit-scrollbar { display: none; }   /* ADDED: chrome/safari scrollbar chhupao */
 
   #inputBar input[type="text"] {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 60px;    /* CHANGED: pehle "flex: 1" tha, ab min-basis diya taaki bahut zyada shrink na ho */
+    min-width: 60px;   /* ADDED */
     padding: 12px 16px;
     border-radius: 24px;
     border: 1px solid var(--glass-border);
@@ -1473,6 +1476,10 @@
   </div>
 
   <div id="toast"></div>
+  <div id="reconnectOverlay" style="display:none;position:fixed;inset:0;z-index:1800;background:#0b0c14;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:30px;height:30px;border:3px solid rgba(255,255,255,0.15);border-top-color:#b294f5;border-radius:50%;animation:ckSpin 0.7s linear infinite;"></div>
+  <div style="color:#9b9bb0;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;">Group me wapas connect ho rahe hain...</div>
+</div>
 
 <script>
 (function () {
@@ -2292,33 +2299,38 @@
   // Refresh ke baad seedha wapas usi group me le jaane ki koshish —
   // room modal ek "connecting" state me dikhta hai jab tak reply na aa jaaye.
   function attemptAutoRejoin(code) {
-    usernameModal.classList.add("hide");
-    roomModal.classList.remove("hide");
-    roomModalTitle.textContent = `Namaste, ${username}!`;
-    clearRoomError();
-    switchRoomTab("join");
-    createSuccessBox.classList.remove("show");
-    joinCodeInput.value = code;
-    inviteBar.classList.remove("show");
-    joinPasswordWrap.classList.remove("show");
-    renderRecentGroups();
+  // Auth screens (naam/group modal, slideshow) bilkul nahi dikhate —
+  // sirf chhota spinner, taaki "phir se login" jaisa na lage.
+  usernameModal.classList.add("hide");
+  roomModal.classList.add("hide");
+  authBgEl.classList.add("hide");
+  reconnectOverlay.style.display = "flex";
 
-    joinRoomBtn.disabled = true;
-    joinRoomBtn.textContent = "Wapas connect ho rahe hain...";
+  let savedPassword = "";
+  try { savedPassword = localStorage.getItem("roomPassword:" + code) || ""; } catch (e) {}
 
-    let savedPassword = "";
-    try { savedPassword = localStorage.getItem("roomPassword:" + code) || ""; } catch (e) {}
+  connectAndJoinRoom(code, savedPassword, (err) => {
+    reconnectOverlay.style.display = "none";
 
-    connectAndJoinRoom(code, savedPassword, (err) => {
-      joinRoomBtn.disabled = false;
-      joinRoomBtn.innerHTML = 'Group Join Karein <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-      if (err) {
-        // Password badal gaya ho ya group delete ho gaya ho — user ko
-        // manually try karne dete hain, room list already dikh rahi hai.
-        showRoomError(err);
-      }
-    });
-  }
+    if (err) {
+      // Sirf genuine fail (password badla / group delete hua) par hi
+      // form dikhao — normal case me user ye kabhi dekhega hi nahi.
+      authBgEl.classList.remove("hide");
+      startAuthBgSlideshow();
+      usernameModal.classList.add("hide");
+      roomModal.classList.remove("hide");
+      roomModalTitle.textContent = `Namaste, ${username}!`;
+      clearRoomError();
+      switchRoomTab("join");
+      createSuccessBox.classList.remove("show");
+      joinCodeInput.value = code;
+      inviteBar.classList.remove("show");
+      joinPasswordWrap.classList.remove("show");
+      renderRecentGroups();
+      showRoomError(err);
+    }
+  });
+}
 
   // =================================================================
   //  Boot sequence: URL me ?room=CODE hai kya? saved username hai kya?
