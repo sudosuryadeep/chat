@@ -2366,8 +2366,11 @@
   });
 
   // Header ka group naam bhi dabane se "Switch Group" jaisa hi kaam kare
-  chatHeaderTitle.addEventListener("click", () => openSwitchGroup());
   switchGroupBtn.addEventListener("click", () => openSwitchGroup());
+  chatHeaderTitle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openMembersModal();
+});
 
   function openSwitchGroup() {
     if (inCall) endCall();
