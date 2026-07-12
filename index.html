@@ -716,6 +716,122 @@
     display: flex; align-items: center; justify-content: center;
   }
 
+  /* ---------- Group call ---------- */
+  #callBtn.active {
+    background: var(--accent-soft);
+    border-color: rgba(178,148,245,0.4);
+    color: var(--accent);
+  }
+  #callBadge {
+    display: none;
+    background: var(--accent2);
+    color: #06231f;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 20px;
+    min-width: 15px;
+    text-align: center;
+    position: absolute;
+    top: -3px;
+    right: -3px;
+  }
+  #callBadge.show { display: block; }
+  #callBtnWrap { position: relative; }
+
+  #callOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 6, 12, 0.97);
+    backdrop-filter: blur(6px);
+    z-index: 1500;
+    flex-direction: column;
+  }
+  #callOverlay.show { display: flex; }
+  #callOverlayHeader {
+    padding: 14px 18px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    flex-shrink: 0;
+  }
+  #callGrid {
+    flex: 1;
+    display: grid;
+    gap: 10px;
+    padding: 8px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    align-content: center;
+    overflow-y: auto;
+  }
+  .callTile {
+    position: relative;
+    background: #111119;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+  .callTile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .callTile.camOff video { visibility: hidden; }
+  .callTile .callAvatar {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-light);
+    background: linear-gradient(135deg, rgba(178,148,245,0.25), rgba(109,79,201,0.2));
+  }
+  .callTile.camOff .callAvatar { display: flex; }
+  .callTile .callName {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(0,0,0,0.5);
+    padding: 3px 10px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .callTile .callName svg { width: 12px; height: 12px; }
+  #callControls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+  #callControls .iconBtn { width: 52px; height: 52px; }
+  #callControls .iconBtn.off {
+    background: rgba(255,255,255,0.16);
+    color: var(--text-muted);
+  }
+  #endCallBtn {
+    background: var(--danger) !important;
+    border-color: var(--danger) !important;
+    color: #fff !important;
+  }
+  #callConnecting {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 10px;
+  }
+
   @media (max-width: 768px) {
     #app.visible { grid-template-columns: 1fr; }
     #sidebar {
@@ -735,6 +851,7 @@
     #inputBar { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
     .iconBtn { width: 40px; height: 40px; }
     .msg .actions { opacity: 1; top: -12px; }
+    #callGrid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   }
 
   @media (max-width: 380px) {
@@ -796,6 +913,12 @@
       <div id="chatHeader">
         <button class="iconBtn" id="menuToggle"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         <h1><span id="roomTitle">Group Chat</span><span id="unreadBadge">0</span></h1>
+        <div id="callBtnWrap">
+          <button class="iconBtn" id="callBtn" title="Call shuru karein">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.79.68 2.63a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.45-1.27a2 2 0 0 1 2.11-.45c.84.33 1.73.56 2.63.68A2 2 0 0 1 22 16.92z"/></svg>
+          </button>
+          <span id="callBadge">0</span>
+        </div>
         <button class="iconBtn" id="searchToggleBtn" title="Search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
         <button class="iconBtn" id="notifyToggleBtn" title="Notifications">
           <svg class="icon" id="notifyIconOn" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -854,6 +977,27 @@
     <img id="lightboxImg" src="" alt="" />
   </div>
 
+  <!-- ---------- Group voice/video call overlay ---------- -->
+  <div id="callOverlay">
+    <div id="callOverlayHeader">Group Call — jitna chahein utna der connected rahein</div>
+    <div id="callGrid"></div>
+    <div id="callConnecting"></div>
+    <div id="callControls">
+      <button class="iconBtn" id="toggleMicBtn" title="Mic on/off">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
+      </button>
+      <button class="iconBtn" id="toggleCamBtn" title="Camera on/off">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      </button>
+      <button class="iconBtn" id="switchCamBtn" title="Camera switch karein (front/back)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      </button>
+      <button class="iconBtn" id="endCallBtn" title="Call khatam karein">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.79.68 2.63a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.45-1.27a2 2 0 0 1 2.11-.45c.84.33 1.73.56 2.63.68A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
+    </div>
+  </div>
+
 <script>
 (function () {
   "use strict";
@@ -904,6 +1048,17 @@
   const bgLayer         = document.getElementById("bgLayer");
   const themeGrid       = document.getElementById("themeGrid");
   const clearChatLabel  = document.getElementById("clearChatLabel");
+
+  // Call UI elements
+  const callBtn          = document.getElementById("callBtn");
+  const callBadge        = document.getElementById("callBadge");
+  const callOverlay      = document.getElementById("callOverlay");
+  const callGrid         = document.getElementById("callGrid");
+  const callConnecting   = document.getElementById("callConnecting");
+  const toggleMicBtn     = document.getElementById("toggleMicBtn");
+  const toggleCamBtn     = document.getElementById("toggleCamBtn");
+  const switchCamBtn     = document.getElementById("switchCamBtn");
+  const endCallBtn       = document.getElementById("endCallBtn");
 
   // Change this to whatever username should have admin rights.
   // NOTE: since this app has no login/password, this is a soft check —
@@ -1252,6 +1407,7 @@
   userBadge.addEventListener("click", () => {
     const ok = confirm("Kya aap apna naam badalna chahte hain? (Chat se dobara connect hoga)");
     if (!ok) return;
+    if (inCall) endCall();
     if (socket) socket.disconnect();
     localStorage.removeItem("chatUsername");
     location.reload();
@@ -1329,6 +1485,29 @@
     // Keeps the anime background in sync for every connected user.
     socket.on("backgroundChanged", (url) => {
       applyBackground(url || null, false);
+    });
+
+    // ---- Group call events ----
+    socket.on("callParticipants", (list) => {
+      updateCallBadge(list.length);
+    });
+
+    socket.on("call:existingParticipants", (list) => {
+      callConnecting.textContent = list.length ? "Connect ho raha hai..." : "";
+      list.forEach((p) => callUser(p.socketId, p.username));
+    });
+
+    socket.on("call:userJoined", ({ username: joinedName }) => {
+      // Naya banda khud offer bhejega existing sabko, hume sirf wait
+      // karna hai uska "call:signal" (offer) aane ka.
+      renderSystemMessage(`${joinedName} call me shamil ho gaye`);
+    });
+
+    socket.on("call:signal", handleCallSignal);
+
+    socket.on("call:userLeft", (socketId) => {
+      removeCallTile(socketId);
+      closePeer(socketId);
     });
   }
 
@@ -1816,6 +1995,246 @@
 
   window.addEventListener("beforeunload", () => {
     pendingBlobs.forEach((url) => URL.revokeObjectURL(url));
+    if (localStream) localStream.getTracks().forEach((t) => t.stop());
+  });
+
+  // =================================================================
+  //  GROUP VOICE/VIDEO CALL (WebRTC mesh, signaling via Socket.IO)
+  // =================================================================
+  //
+  //  - Har participant har doosre participant se DIRECT connection
+  //    banata hai (mesh). 2-4 logon ke liye ye best/simplest approach
+  //    hai, aur audio/video kabhi server se hokar nahi jaata.
+  //  - STUN sirf usually kaam karta hai jab dono log NAT ke peeche
+  //    hon jo "predictable" ho. Mobile carrier networks (jio/airtel
+  //    4G/5G) zyada tar Carrier-Grade NAT (CGNAT) / symmetric NAT use
+  //    karte hain, jaha STUN fail ho jaata hai — is wajah se TURN
+  //    server MUST HAVE hai jab log alag-alag network (wifi + mobile
+  //    data) pe hon, jaisa aapne bataya.
+  //  - Yahan Open Relay Project ka FREE public TURN diya hai testing
+  //    ke liye. Production/heavy use ke liye apna TURN lena behtar
+  //    hoga (metered.ca free tier, ya khud coturn host karo VPS pe).
+  // =================================================================
+
+  const ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+  ];
+
+  let localStream = null;
+  let inCall = false;
+  let micOn = true;
+  let camOn = true;
+  let facingMode = "user"; // front camera by default
+  const peers = new Map(); // socketId -> RTCPeerConnection
+  const remoteNames = new Map(); // socketId -> username
+
+  function updateCallBadge(count) {
+    if (count > 0) {
+      callBadge.textContent = count > 9 ? "9+" : String(count);
+      callBadge.classList.add("show");
+    } else {
+      callBadge.classList.remove("show");
+    }
+  }
+
+  function personInitial(name) {
+    return (name || "?").trim().charAt(0).toUpperCase();
+  }
+
+  function addOrUpdateCallTile(id, name, stream, isLocal) {
+    let tile = document.getElementById("tile-" + id);
+    if (!tile) {
+      tile = document.createElement("div");
+      tile.className = "callTile";
+      tile.id = "tile-" + id;
+      tile.innerHTML = `
+        <video autoplay playsinline ${isLocal ? "muted" : ""}></video>
+        <div class="callAvatar">${escapeHtml(personInitial(name))}</div>
+        <span class="callName">${escapeHtml(name)}${isLocal ? " (Aap)" : ""}</span>
+      `;
+      callGrid.appendChild(tile);
+    }
+    const videoEl = tile.querySelector("video");
+    if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
+    return tile;
+  }
+
+  function removeCallTile(id) {
+    const t = document.getElementById("tile-" + id);
+    if (t) t.remove();
+  }
+
+  function setLocalCamVisualState() {
+    const tile = document.getElementById("tile-local");
+    if (tile) tile.classList.toggle("camOff", !camOn);
+  }
+
+  function closePeer(socketId) {
+    const pc = peers.get(socketId);
+    if (pc) {
+      pc.close();
+      peers.delete(socketId);
+    }
+    remoteNames.delete(socketId);
+  }
+
+  function createPeerConnection(socketId, remoteUsername) {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    remoteNames.set(socketId, remoteUsername);
+
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit("call:signal", { to: socketId, data: { candidate: e.candidate } });
+      }
+    };
+
+    pc.ontrack = (e) => {
+      addOrUpdateCallTile(socketId, remoteUsername, e.streams[0], false);
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (["failed", "disconnected", "closed"].includes(pc.connectionState)) {
+        removeCallTile(socketId);
+      }
+    };
+
+    peers.set(socketId, pc);
+    return pc;
+  }
+
+  async function callUser(socketId, remoteUsername) {
+    const pc = createPeerConnection(socketId, remoteUsername);
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit("call:signal", { to: socketId, data: { sdp: pc.localDescription } });
+    } catch (err) {
+      console.error("Offer banane me error:", err);
+    }
+  }
+
+  async function handleCallSignal({ from, username: fromName, data }) {
+    let pc = peers.get(from);
+    if (!pc) pc = createPeerConnection(from, fromName || "User");
+
+    try {
+      if (data.sdp) {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        if (data.sdp.type === "offer") {
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("call:signal", { to: from, data: { sdp: pc.localDescription } });
+        }
+      } else if (data.candidate) {
+        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    } catch (err) {
+      console.error("Call signal handle karne me error:", err);
+    }
+  }
+
+  async function startCall() {
+    if (inCall) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Ye browser call feature support nahi karta.");
+      return;
+    }
+    if (location.protocol !== "https:" && location.hostname !== "localhost") {
+      alert("Call sirf HTTPS site par kaam karti hai. Apni site ko HTTPS par host karein.");
+      return;
+    }
+
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+        audio: true,
+      });
+    } catch (err) {
+      alert("Camera/mic access nahi mila: " + err.message);
+      return;
+    }
+
+    inCall = true;
+    micOn = true;
+    camOn = true;
+    callBtn.classList.add("active");
+    callOverlay.classList.add("show");
+    callConnecting.textContent = "";
+    addOrUpdateCallTile("local", username, localStream, true);
+    socket.emit("call:join");
+  }
+
+  function endCall() {
+    if (!inCall) return;
+    inCall = false;
+    callBtn.classList.remove("active");
+    socket.emit("call:leave");
+
+    peers.forEach((pc) => pc.close());
+    peers.clear();
+    remoteNames.clear();
+    callGrid.innerHTML = "";
+    callConnecting.textContent = "";
+
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+      localStream = null;
+    }
+    callOverlay.classList.remove("show");
+  }
+
+  callBtn.addEventListener("click", () => {
+    inCall ? endCall() : startCall();
+  });
+
+  endCallBtn.addEventListener("click", endCall);
+
+  toggleMicBtn.addEventListener("click", () => {
+    if (!localStream) return;
+    micOn = !micOn;
+    localStream.getAudioTracks().forEach((t) => (t.enabled = micOn));
+    toggleMicBtn.classList.toggle("off", !micOn);
+  });
+
+  toggleCamBtn.addEventListener("click", () => {
+    if (!localStream) return;
+    camOn = !camOn;
+    localStream.getVideoTracks().forEach((t) => (t.enabled = camOn));
+    toggleCamBtn.classList.toggle("off", !camOn);
+    setLocalCamVisualState();
+  });
+
+  // Mobile pe front/back camera switch (agar dono available hon)
+  switchCamBtn.addEventListener("click", async () => {
+    if (!localStream) return;
+    facingMode = facingMode === "user" ? "environment" : "user";
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
+      const newTrack = newStream.getVideoTracks()[0];
+      const oldTrack = localStream.getVideoTracks()[0];
+
+      // Sabhi active peer connections me track replace karo (renegotiation
+      // ki zaroorat nahi padti addTrack/removeTrack se, sirf ek clean swap)
+      peers.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
+        if (sender) sender.replaceTrack(newTrack);
+      });
+
+      localStream.removeTrack(oldTrack);
+      oldTrack.stop();
+      localStream.addTrack(newTrack);
+      newTrack.enabled = camOn;
+
+      const localTile = document.getElementById("tile-local");
+      if (localTile) localTile.querySelector("video").srcObject = localStream;
+    } catch (err) {
+      alert("Camera switch nahi ho paaya: " + err.message);
+    }
   });
 
 })();

@@ -12,6 +12,7 @@
  *   - Delete / clear chat (also removes Cloudinary media) - admin only
  *   - Custom chat background (persisted to disk, broadcast to everyone)
  *   - Timestamps
+ *   - Group voice/video calling (WebRTC mesh, 2-4 log, signaling yahi se)
  * ================================================================
  */
 
@@ -238,12 +239,17 @@ app.delete("/api/messages/:id", async (req, res) => {
 });
 
 // ---------------------------------------------------------------
-// Socket.IO - realtime chat + online users
+// Socket.IO - realtime chat + online users + group call signaling
 // ---------------------------------------------------------------
 const onlineUsers = new Map(); // socket.id -> username
+const callParticipants = new Map(); // socket.id -> username (jo call me hain)
 
 function broadcastOnlineUsers() {
   io.emit("onlineUsers", Array.from(onlineUsers.values()));
+}
+
+function broadcastCallParticipants() {
+  io.emit("callParticipants", Array.from(callParticipants.values()));
 }
 
 io.on("connection", (socket) => {
@@ -266,6 +272,12 @@ io.on("connection", (socket) => {
 
     // Naye user ko current background bhi bhej do
     socket.emit("backgroundChanged", settings.background);
+
+    // Agar call already chal rahi hai to naye user ko batao (join button
+    // ke saath "N log call me hain" jaisa UI dikhane ke kaam aata hai)
+    if (callParticipants.size > 0) {
+      socket.emit("callParticipants", Array.from(callParticipants.values()));
+    }
 
     socket.broadcast.emit("systemMessage", `${username} chat me aa gaya/gayi hai 👋`);
   });
@@ -362,10 +374,55 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("userStopTyping");
   });
 
+  // ---------------------------------------------------------------
+  // Group voice/video call signaling (WebRTC mesh).
+  // Server sirf messages relay karta hai (offer/answer/ICE candidates) -
+  // actual audio/video stream kabhi server se hokar nahi jaata, seedha
+  // browser-se-browser jaata hai. 2-4 logon ke liye ye kaafi hai.
+  // ---------------------------------------------------------------
+  socket.on("call:join", () => {
+    if (!currentUsername) return;
+
+    // Naye joiner ko batao ki call me pehle se kaun kaun hai, taaki
+    // woh un sabko offer bhej sake.
+    const existing = Array.from(callParticipants.entries())
+      .filter(([id]) => id !== socket.id)
+      .map(([id, name]) => ({ socketId: id, username: name }));
+    socket.emit("call:existingParticipants", existing);
+
+    callParticipants.set(socket.id, currentUsername);
+    socket.broadcast.emit("call:userJoined", { socketId: socket.id, username: currentUsername });
+    broadcastCallParticipants();
+  });
+
+  // payload: { to: socketId, data: { sdp } | { candidate } }
+  // Point-to-point relay — sirf jisko bheja gaya hai wahi receive karta hai.
+  socket.on("call:signal", ({ to, data }) => {
+    if (!to || !data) return;
+    io.to(to).emit("call:signal", { from: socket.id, username: currentUsername, data });
+  });
+
+  socket.on("call:leave", () => {
+    if (callParticipants.has(socket.id)) {
+      callParticipants.delete(socket.id);
+      socket.broadcast.emit("call:userLeft", socket.id);
+      broadcastCallParticipants();
+    }
+  });
+
   socket.on("disconnect", () => {
     const username = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);
     broadcastOnlineUsers();
+
+    // Agar disconnect hone wala call me tha, baaki participants ko batao
+    // taaki unki taraf se bhi peer connection clean up ho jaye.
+    if (callParticipants.has(socket.id)) {
+      callParticipants.delete(socket.id);
+      socket.broadcast.emit("call:userLeft", socket.id);
+      broadcastCallParticipants();
+    }
+
     if (username) {
       io.emit("systemMessage", `${username} chat se chala gaya 🚪`);
     }
