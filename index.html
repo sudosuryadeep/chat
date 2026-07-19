@@ -1274,6 +1274,56 @@
     #inputBar { padding: 8px 16px; }
     .modal-box { padding: 20px; }
   }
+
+  /* ---------- Floating draggable video (PiP) ---------- */
+.videoWrap { position: relative; }
+.pipTriggerBtn {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.pipTriggerBtn svg { width: 14px; height: 14px; stroke: #fff; }
+
+#floatingPip {
+  position: fixed;
+  width: 200px;
+  aspect-ratio: 9/16;
+  max-height: 60vh;
+  border-radius: 16px;
+  overflow: hidden;
+  z-index: 2200;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.55);
+  border: 1px solid var(--glass-border);
+  background: #000;
+  display: none;
+  touch-action: none;
+  cursor: grab;
+}
+#floatingPip.show { display: block; }
+#floatingPip video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+#floatingPip .pipClose {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+}
 </style>
 </head>
 <body>
@@ -1491,6 +1541,13 @@
     <img id="lightboxImg" src="" alt="" />
   </div>
 
+  <div id="floatingPip">
+  <button class="pipClose" id="pipCloseBtn">
+    <svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;stroke:#fff"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <video id="pipVideo" playsinline autoplay controls></video>
+</div>
+
   <!-- ---------- Members / online modal (Telegram-style member list) ---------- -->
   <div id="membersModal" class="authModal hide" style="z-index:1600;">
     <div class="modal-box" style="max-width: 360px; text-align: left;">
@@ -1638,6 +1695,11 @@ const changeCodeBtn     = document.getElementById("changeCodeBtn");
   const toggleCamBtn     = document.getElementById("toggleCamBtn");
   const switchCamBtn     = document.getElementById("switchCamBtn");
   const endCallBtn       = document.getElementById("endCallBtn");
+
+  // ---- Floating draggable video (PiP) ----
+const floatingPip = document.getElementById("floatingPip");
+const pipVideo = document.getElementById("pipVideo");
+const pipCloseBtn = document.getElementById("pipCloseBtn");
 
   let username = "";
   let isAdmin = false;
@@ -2680,14 +2742,18 @@ socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
             <a class="dlLink" href="${att.downloadUrl || att.url}" download title="Download">${DL_ICON}Download</a>
           </div>
         `;
-      } else if (att.type === "video") {
-        attachHtml = `
-          <video src="${src}" controls preload="auto" playsinline></video>
-          <div class="attachHead">
-            <a class="dlLink" href="${att.downloadUrl || att.url}" download title="Download">${DL_ICON}Download</a>
-          </div>
-        `;
-      } else {
+} else if (att.type === "video") {
+  const PIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="12" height="10" rx="2"/><path d="M18 9v-2a2 2 0 0 0-2-2H6"/><path d="M22 15v-6" /></svg>';
+  attachHtml = `
+    <div class="videoWrap">
+      <video class="attachVideo" src="${src}" controls preload="auto" playsinline data-full="${att.downloadUrl || att.url}"></video>
+      <button class="pipTriggerBtn" title="Video ko float karein">${PIP_ICON}</button>
+    </div>
+    <div class="attachHead">
+      <a class="dlLink" href="${att.downloadUrl || att.url}" download title="Download">${DL_ICON}Download</a>
+    </div>
+  `;
+} else {
         attachHtml = `
           <a class="fileCard" href="${att.downloadUrl || att.url}" download="${escapeHtml(att.name || 'file')}" title="Download">
             <span class="fileBadge">${fileBadgeIcon(att.type, att.mimetype)}</span>
@@ -2751,7 +2817,14 @@ socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
     if (imgEl) {
       imgEl.addEventListener("click", () => openLightbox(imgEl.dataset.full));
     }
-
+const pipBtn = div.querySelector(".pipTriggerBtn");
+if (pipBtn) {
+  pipBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const vidEl = div.querySelector(".attachVideo");
+    openFloatingPip(vidEl.dataset.full || vidEl.src, vidEl.currentTime);
+  });
+}
     attachSwipeToReply(div, message, isOwn);
 
     chatWindow.appendChild(div);
@@ -2904,6 +2977,61 @@ socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
     replyPreviewBar.classList.remove("show");
   }
   cancelReplyBtn.addEventListener("click", clearReplyingTo);
+
+
+  function openFloatingPip(src, startAt) {
+  pipVideo.src = src;
+  pipVideo.currentTime = startAt || 0;
+  pipVideo.play().catch(() => {});
+  floatingPip.classList.add("show");
+  if (!floatingPip.style.left) {
+    floatingPip.style.left = (window.innerWidth - 216) + "px";
+    floatingPip.style.top = (window.innerHeight - 380) + "px";
+  }
+}
+function closeFloatingPip() {
+  pipVideo.pause();
+  pipVideo.removeAttribute("src");
+  pipVideo.load();
+  floatingPip.classList.remove("show");
+}
+pipCloseBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  closeFloatingPip();
+});
+
+// Drag support — mouse aur touch dono
+(function enablePipDrag() {
+  let sx = 0, sy = 0, startLeft = 0, startTop = 0, dragging = false;
+  floatingPip.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".pipClose")) return;
+    dragging = true;
+    sx = e.clientX; sy = e.clientY;
+    const rect = floatingPip.getBoundingClientRect();
+    startLeft = rect.left; startTop = rect.top;
+    floatingPip.setPointerCapture(e.pointerId);
+    floatingPip.style.cursor = "grabbing";
+  });
+  floatingPip.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    let newLeft = startLeft + (e.clientX - sx);
+    let newTop = startTop + (e.clientY - sy);
+    const maxLeft = window.innerWidth - floatingPip.offsetWidth;
+    const maxTop = window.innerHeight - floatingPip.offsetHeight;
+    newLeft = Math.max(0, Math.min(maxLeft, newLeft));
+    newTop = Math.max(0, Math.min(maxTop, newTop));
+    floatingPip.style.left = newLeft + "px";
+    floatingPip.style.top = newTop + "px";
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    try { floatingPip.releasePointerCapture(e.pointerId); } catch (err) {}
+    floatingPip.style.cursor = "grab";
+  }
+  floatingPip.addEventListener("pointerup", endDrag);
+  floatingPip.addEventListener("pointercancel", endDrag);
+})();
 
   // ---- Lightbox for images ----
   function openLightbox(url) {
