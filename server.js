@@ -164,15 +164,28 @@ function resourceTypeFor(type) {
   return "raw"; // pdf, zip, docs, etc.
 }
 
-function uploadBufferToCloudinary(buffer, resourceType) {
+function uploadBufferToCloudinary(buffer, resourceType, originalName) {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { resource_type: resourceType, folder: "video-chat-app" },
-      (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      }
-    );
+    const options = { resource_type: resourceType, folder: "video-chat-app" };
+
+    // "raw" resources (PDF, ZIP, DOCX, etc.) ke case me Cloudinary
+    // image/video jaisa alag se extension nahi jodta — extension
+    // public_id ke andar hi dena padta hai, warna URL bina extension
+    // ke ban jaata hai aur file download hone par corrupt/unusable lagti hai.
+    if (resourceType === "raw" && originalName) {
+      const ext = path.extname(originalName); // ".pdf"
+      const base = path
+        .basename(originalName, ext)
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 60);
+      const uniqueId = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+      options.public_id = `${uniqueId}-${base}${ext}`;
+    }
+
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
     stream.end(buffer);
   });
 }
@@ -273,9 +286,9 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "File nahi mili." });
   }
   try {
-    const type = attachmentTypeFor(req.file.mimetype);
-    const resourceType = resourceTypeFor(type);
-    const result = await uploadBufferToCloudinary(req.file.buffer, resourceType);
+const type = attachmentTypeFor(req.file.mimetype);
+const resourceType = resourceTypeFor(type);
+const result = await uploadBufferToCloudinary(req.file.buffer, resourceType, req.file.originalname);
 
     const attachment = {
       url: result.secure_url,
