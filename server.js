@@ -290,15 +290,22 @@ const type = attachmentTypeFor(req.file.mimetype);
 const resourceType = resourceTypeFor(type);
 const result = await uploadBufferToCloudinary(req.file.buffer, resourceType, req.file.originalname);
 
-    const attachment = {
-      url: result.secure_url,
-      publicId: result.public_id,
-      name: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-      type,
-    };
-    res.json({ attachment });
+    // Cloudinary ka "download" URL banate hain (fl_attachment flag)
+// taaki browser hamesha force-download kare, sirf navigate/preview na kare.
+const downloadUrl = result.secure_url.includes("/upload/")
+  ? result.secure_url.replace("/upload/", "/upload/fl_attachment/")
+  : result.secure_url;
+
+const attachment = {
+  url: result.secure_url,       // inline preview ke liye (img/video src)
+  downloadUrl,                  // download button/link ke liye
+  publicId: result.public_id,
+  name: req.file.originalname,
+  size: req.file.size,
+  mimetype: req.file.mimetype,
+  type,
+};
+res.json({ attachment });
   } catch (err) {
     console.error("Cloudinary upload error:", err.message);
     res.status(500).json({ error: "Upload fail ho gaya: " + err.message });

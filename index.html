@@ -2668,28 +2668,28 @@ socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
     let attachHtml = "";
     if (message.attachment) {
       const att = message.attachment;
-      let src = att.url;
+      let src = att.downloadUrl || att.url;
       if (isOwn && message.clientTempId && pendingBlobs.has(message.clientTempId)) {
         src = pendingBlobs.get(message.clientTempId);
       }
 
       if (att.type === "image") {
         attachHtml = `
-          <img class="attachImg" src="${src}" alt="${escapeHtml(att.name || "photo")}" loading="lazy" data-full="${att.url}" />
+          <img class="attachImg" src="${src}" alt="${escapeHtml(att.name || "photo")}" loading="lazy" data-full="${att.downloadUrl || att.url}" />
           <div class="attachHead">
-            <a class="dlLink" href="${att.url}" download title="Download">${DL_ICON}Download</a>
+            <a class="dlLink" href="${att.downloadUrl || att.url}" download title="Download">${DL_ICON}Download</a>
           </div>
         `;
       } else if (att.type === "video") {
         attachHtml = `
           <video src="${src}" controls preload="auto" playsinline></video>
           <div class="attachHead">
-            <a class="dlLink" href="${att.url}" download title="Download">${DL_ICON}Download</a>
+            <a class="dlLink" href="${att.downloadUrl || att.url}" download title="Download">${DL_ICON}Download</a>
           </div>
         `;
       } else {
         attachHtml = `
-          <a class="fileCard" href="${att.url}" download="${escapeHtml(att.name || 'file')}" title="Download">
+          <a class="fileCard" href="${att.downloadUrl || att.url}" download="${escapeHtml(att.name || 'file')}" title="Download">
             <span class="fileBadge">${fileBadgeIcon(att.type, att.mimetype)}</span>
             <span class="fileInfo">
               <span class="fileName">${escapeHtml(att.name || "File")}</span>
