@@ -2689,7 +2689,7 @@ socket.on("roomCodeChanged", ({ oldCode, newCode }) => {
         `;
       } else {
         attachHtml = `
-          <a class="fileCard" href="${att.url}" download title="Download">
+          <a class="fileCard" href="${att.url}" download="${escapeHtml(att.name || 'file')}" title="Download">
             <span class="fileBadge">${fileBadgeIcon(att.type, att.mimetype)}</span>
             <span class="fileInfo">
               <span class="fileName">${escapeHtml(att.name || "File")}</span>
