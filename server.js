@@ -387,6 +387,19 @@ io.on("connection", (socket) => {
       broadcastOnlineUsers(roomCode);
     }
 
+    // Agar disconnect hone wala banda hi video ka controller tha, to control
+// kisi aur online member ko de do (agar koi bacha hai), warna PiP band kar do
+const pipState = roomPipState.get(roomCode);
+if (pipState && pipState.controller === socket.data.username) {
+  const remaining = onlineMap ? Array.from(onlineMap.values()) : [];
+  if (remaining.length > 0) {
+    pipState.controller = remaining[0];
+    io.to(roomCode).emit("pip:controllerChanged", { controller: pipState.controller });
+  } else {
+    roomPipState.delete(roomCode);
+    io.to(roomCode).emit("pip:close");
+  }
+}
     const callMap = roomCallParticipants.get(roomCode);
     if (callMap && callMap.has(socket.id)) {
       callMap.delete(socket.id);
@@ -453,6 +466,17 @@ io.on("connection", (socket) => {
 
     // Is group ki current background bhej do
     socket.emit("backgroundChanged", roomBackgrounds[roomCode] || null);
+
+    // Agar is group me PiP video already float ho raha hai, naye aane wale ko bhi bhejo
+const pipState = roomPipState.get(roomCode);
+if (pipState) {
+  socket.emit("pip:open", {
+    videoUrl: pipState.videoUrl,
+    startAt: pipState.startAt,
+    openedBy: pipState.controller,
+    controller: pipState.controller,
+  });
+}
 
     // Agar is group me call already chal rahi hai, naye aane wale ko batao
     const callMap = roomCallParticipants.get(roomCode);
@@ -692,6 +716,97 @@ socket.on("changeGroupCode", async ({ newCode }) => {
     saveSettings(roomBackgrounds); // disk par persist (server restart ke baad bhi yaad rahega)
     io.to(roomCode).emit("backgroundChanged", roomBackgrounds[roomCode]);
   });
+
+// Per-room PiP state: kaunsa video khula hai, kiske paas control hai
+const roomPipState = new Map(); // roomCode -> { videoUrl, startAt, controller }
+
+function pipControllerGuard(socket) {
+  const roomCode = socket.data.roomCode;
+  const state = roomPipState.get(roomCode);
+  if (!roomCode || !state) return null;
+  if (state.controller !== socket.data.username) return null;
+  return { roomCode, state };
+}
+
+socket.on("pip:open", ({ videoUrl, startAt }) => {
+  const roomCode = socket.data.roomCode;
+  const username = socket.data.username;
+  if (!roomCode || !videoUrl) return;
+
+  roomPipState.set(roomCode, { videoUrl, startAt: startAt || 0, controller: username });
+
+  socket.to(roomCode).emit("pip:open", {
+    videoUrl,
+    startAt: startAt || 0,
+    openedBy: username,
+    controller: username,
+  });
+});
+
+socket.on("pip:close", () => {
+  const roomCode = socket.data.roomCode;
+  if (!roomCode) return;
+  roomPipState.delete(roomCode);
+  socket.to(roomCode).emit("pip:close");
+});
+
+// Sirf current controller ke play/pause/seek sabko sync hote hain
+socket.on("pip:play", ({ time }) => {
+  const ctx = pipControllerGuard(socket);
+  if (!ctx) return;
+  socket.to(ctx.roomCode).emit("pip:play", { time });
+});
+
+socket.on("pip:pause", ({ time }) => {
+  const ctx = pipControllerGuard(socket);
+  if (!ctx) return;
+  socket.to(ctx.roomCode).emit("pip:pause", { time });
+});
+
+socket.on("pip:seek", ({ time }) => {
+  const ctx = pipControllerGuard(socket);
+  if (!ctx) return;
+  socket.to(ctx.roomCode).emit("pip:seek", { time });
+});
+
+// Koi bhi control maang sakta hai — request current controller ko jaati hai
+socket.on("pip:requestControl", () => {
+  const roomCode = socket.data.roomCode;
+  const state = roomPipState.get(roomCode);
+  if (!roomCode || !state) return;
+
+  const onlineMap = roomOnlineUsers.get(roomCode);
+  if (!onlineMap) return;
+
+  let targetSocketId = null;
+  onlineMap.forEach((uname, sockId) => {
+    if (uname === state.controller) targetSocketId = sockId;
+  });
+
+  if (targetSocketId) {
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) targetSocket.emit("pip:controlRequested", { from: socket.data.username });
+  }
+});
+
+// Control dena — sirf current controller ya group admin de sakta hai,
+// bina request ke bhi (proactively) diya ja sakta hai
+socket.on("pip:grantControl", async ({ to }) => {
+  const roomCode = socket.data.roomCode;
+  const state = roomPipState.get(roomCode);
+  if (!roomCode || !state || !to) return;
+
+  const requester = socket.data.username;
+  const admin = await isRoomAdmin(requester, roomCode);
+  if (state.controller !== requester && !admin) return;
+
+  const onlineMap = roomOnlineUsers.get(roomCode);
+  const isOnline = onlineMap && Array.from(onlineMap.values()).includes(to);
+  if (!isOnline) return;
+
+  state.controller = to;
+  io.to(roomCode).emit("pip:controllerChanged", { controller: to });
+});
 
   socket.on("typing", (username) => {
     const roomCode = socket.data.roomCode;
